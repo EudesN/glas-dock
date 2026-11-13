@@ -2,7 +2,8 @@
  * Glasdock — the glass look shared by the dock, its panels and the panel widgets.
  * style: 0 = Glass, 1 = Frosted, 2 = Clear (no background), 3 = Solid,
  *        4 = Blur: the window/panel draws Plasma's own background (with real
- *            KWin blur); this item only adds the sheen and accent tint on top
+ *            KWin blur) and this item draws nothing, because Plasma's frame
+ *            has its own shape and anything on top would not line up with it
  */
 import QtQuick
 import org.kde.kirigami as Kirigami
@@ -22,7 +23,7 @@ Item {
     property bool forceBody: false
 
     readonly property bool isBlur: style === 4
-    readonly property bool isGlass: style === 0 || style === 4
+    readonly property bool isGlass: style === 0
     readonly property bool isFrosted: style === 1
     readonly property bool hasBody: (style !== 2 || forceBody) && !isBlur
     readonly property real bodyAlpha: style === 3 ? 1
@@ -77,7 +78,7 @@ Item {
         radius: surface.r - 1
         color: surface.accent
         opacity: surface.accentTint
-        visible: opacity > 0 && (surface.hasBody || surface.isBlur)
+        visible: opacity > 0 && surface.hasBody
     }
 
     // vertical sheen (light from above) — glass only

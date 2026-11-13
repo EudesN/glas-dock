@@ -488,7 +488,7 @@ PlasmoidItem {
             }
 
             Rectangle {
-                opacity: dock.cfg.showLabels && appsMouse.containsMouse ? 1 : 0
+                opacity: dock.cfg.showLabels && !dock.blurStyle && appsMouse.containsMouse ? 1 : 0
                 visible: opacity > 0
                 Behavior on opacity { NumberAnimation { duration: 140 } }
                 width: appsLabel.implicitWidth + Kirigami.Units.largeSpacing * 2
@@ -557,12 +557,13 @@ PlasmoidItem {
             // With the theme background, BottomEdge lets KWin's "Sliding popups"
             // effect slide the whole window (frame + blur) up from the dock. The
             // custom glass background is animated entirely by Launcher.qml.
-            readonly property bool kwinSlides: dock.cfg.launcherAnimation && !dock.cfg.launcherCustomBackground
+            readonly property bool themeBlur: dock.cfg.launcherStyle === 4
+            readonly property bool kwinSlides: dock.cfg.launcherAnimation && themeBlur
             location: kwinSlides ? PlasmaCore.Types.BottomEdge : PlasmaCore.Types.Floating
             // closing on deactivation is animated (onActiveChanged) instead
             hideOnWindowDeactivate: !dock.cfg.launcherAnimation
             onActiveChanged: if (!active && visible && dock.launcherView) dock.launcherView.playClose()
-            backgroundHints: dock.cfg.launcherCustomBackground ? PlasmaCore.Dialog.NoBackground
+            backgroundHints: !themeBlur ? PlasmaCore.Dialog.NoBackground
                                                                : PlasmaCore.Dialog.StandardBackground
             visible: false
 
@@ -594,7 +595,11 @@ PlasmoidItem {
                 height: launcherLoader.height
                 appletInterface: root
                 iconSize: dock.cfg.launcherIconSize
-                customBackground: dock.cfg.launcherCustomBackground
+                style: dock.cfg.launcherStyle
+                radius: dock.cfg.cornerRadius + 4
+                accent: dock.accent
+                accentTint: dock.cfg.glassAccentTint
+                showBorder: dock.cfg.showBorder
                 backgroundOpacity: dock.cfg.launcherOpacity
                 isDark: dock.isDark
                 frameMargins: launcher.margins
@@ -1048,7 +1053,8 @@ PlasmoidItem {
                 // app name on hover
                 Rectangle {
                     id: label
-                    readonly property bool shown: dock.cfg.showLabels && mouse.containsMouse
+                    // (no room for names above a bar-sized Blur panel)
+                    readonly property bool shown: dock.cfg.showLabels && !dock.blurStyle && mouse.containsMouse
                                                   && !(dock.previewOpen && dock.previewTask === task)
                                                   && !dock.contextMenuOpen && !dock.dragging
                     opacity: shown ? 1 : 0

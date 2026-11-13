@@ -41,7 +41,7 @@
     <entry name="launcherGap" type="Int"><default>12</default></entry>
     <entry name="launcherIconSize" type="Int"><default>48</default></entry>
     <entry name="launcherOpacity" type="Double"><default>0.0</default></entry>
-    <entry name="launcherCustomBackground" type="Bool"><default>false</default></entry>
+    <entry name="launcherStyle" type="Int"><default>4</default></entry>
     <entry name="autoPanelHeight" type="Bool"><default>true</default></entry>
     <entry name="launcherWidth" type="Int"><default>720</default></entry>
     <entry name="launcherHeight" type="Int"><default>540</default></entry>
