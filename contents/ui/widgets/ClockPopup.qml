@@ -11,9 +11,19 @@ Item {
     id: popup
 
     property date now: new Date()
+    property color accent: Kirigami.Theme.highlightColor
+    property bool isDark: true
     readonly property real dayProgress: (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400
     readonly property var startOfYear: new Date(now.getFullYear(), 0, 1)
     readonly property int dayOfYear: Math.floor((now - startOfYear) / 86400000) + 1
+    // ISO 8601 week number
+    readonly property int weekNumber: {
+        const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+        const day = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - day);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+    }
 
     implicitWidth: Kirigami.Units.gridUnit * 20
     implicitHeight: layout.implicitHeight
@@ -65,15 +75,31 @@ Item {
                 width: parent.width * popup.dayProgress
                 height: parent.height
                 radius: 2
-                color: Kirigami.Theme.highlightColor
+                color: popup.accent
             }
         }
 
-        PC3.Label {
+        // glass chips
+        RowLayout {
             Layout.topMargin: Kirigami.Units.smallSpacing
-            text: "Day " + popup.dayOfYear + " of the year"
-            font: Kirigami.Theme.smallFont
-            opacity: 0.5
+            spacing: Kirigami.Units.smallSpacing
+            Repeater {
+                model: [
+                    "Day " + popup.dayOfYear,
+                    "Week " + popup.weekNumber,
+                    Qt.formatDate(popup.now, "yyyy")
+                ]
+                delegate: Rectangle {
+                    required property string modelData
+                    implicitWidth: chip.implicitWidth + Kirigami.Units.largeSpacing * 2
+                    implicitHeight: chip.implicitHeight + Kirigami.Units.smallSpacing * 2
+                    radius: height / 2
+                    color: popup.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.4)
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, popup.isDark ? 0.10 : 0.45)
+                    PC3.Label { id: chip; anchors.centerIn: parent; text: modelData; font: Kirigami.Theme.smallFont }
+                }
+            }
         }
     }
 }

@@ -11,8 +11,11 @@ Item {
     id: popup
 
     property var player: null
+    property color accent: Kirigami.Theme.highlightColor
+    property bool isDark: true
     readonly property bool hasPlayer: player !== null && player !== undefined
     readonly property bool playing: hasPlayer && player.playbackStatus === Mpris.PlaybackStatus.Playing
+    readonly property real progress: hasPlayer && player.length > 0 ? Math.min(1, player.position / player.length) : 0
 
     implicitWidth: Kirigami.Units.gridUnit * 22
     implicitHeight: layout.implicitHeight
@@ -78,26 +81,26 @@ Item {
                 // controls
                 RowLayout {
                     Layout.topMargin: Kirigami.Units.smallSpacing
-                    spacing: Kirigami.Units.largeSpacing
-                    enabled: popup.hasPlayer
+                    spacing: Kirigami.Units.mediumSpacing
 
-                    PC3.ToolButton {
-                        icon.name: "media-skip-backward"
-                        icon.width: Kirigami.Units.iconSizes.medium
-                        icon.height: Kirigami.Units.iconSizes.medium
+                    GlassButton {
+                        iconName: "media-skip-backward"
+                        isDark: popup.isDark
                         enabled: popup.hasPlayer && popup.player.canGoPrevious
                         onClicked: popup.player.Previous()
                     }
-                    PC3.ToolButton {
-                        icon.name: popup.playing ? "media-playback-pause" : "media-playback-start"
-                        icon.width: Kirigami.Units.iconSizes.medium
-                        icon.height: Kirigami.Units.iconSizes.medium
+                    GlassButton {
+                        iconName: popup.playing ? "media-playback-pause" : "media-playback-start"
+                        iconSize: Kirigami.Units.iconSizes.medium
+                        filled: true
+                        accent: popup.accent
+                        isDark: popup.isDark
+                        enabled: popup.hasPlayer
                         onClicked: popup.player.PlayPause()
                     }
-                    PC3.ToolButton {
-                        icon.name: "media-skip-forward"
-                        icon.width: Kirigami.Units.iconSizes.medium
-                        icon.height: Kirigami.Units.iconSizes.medium
+                    GlassButton {
+                        iconName: "media-skip-forward"
+                        isDark: popup.isDark
                         enabled: popup.hasPlayer && popup.player.canGoNext
                         onClicked: popup.player.Next()
                     }
@@ -105,19 +108,44 @@ Item {
             }
         }
 
-        // progress
+        // progress: slim track in the accent color, click/drag to seek
         ColumnLayout {
             Layout.fillWidth: true
             visible: popup.hasPlayer && popup.player.length > 0
-            spacing: 2
+            spacing: Kirigami.Units.smallSpacing
 
-            PC3.Slider {
+            Item {
                 Layout.fillWidth: true
-                from: 0
-                to: popup.hasPlayer ? popup.player.length : 1
-                value: popup.hasPlayer ? popup.player.position : 0
-                enabled: popup.hasPlayer && popup.player.canSeek
-                onMoved: popup.player.position = value
+                implicitHeight: 14
+
+                Rectangle {
+                    id: track
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width
+                    height: seekArea.containsMouse || seekArea.pressed ? 6 : 4
+                    radius: height / 2
+                    color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                    Behavior on height { NumberAnimation { duration: 100 } }
+
+                    Rectangle {
+                        width: parent.width * popup.progress
+                        height: parent.height
+                        radius: parent.radius
+                        color: popup.accent
+                    }
+                }
+
+                MouseArea {
+                    id: seekArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    enabled: popup.hasPlayer && popup.player.canSeek
+                    function seek(mx) {
+                        popup.player.position = Math.max(0, Math.min(1, mx / width)) * popup.player.length;
+                    }
+                    onPressed: mouse => seek(mouse.x)
+                    onPositionChanged: mouse => { if (pressed) seek(mouse.x); }
+                }
             }
             RowLayout {
                 PC3.Label { text: popup.hasPlayer ? popup.fmt(popup.player.position) : ""; font: Kirigami.Theme.smallFont; opacity: 0.6 }
@@ -126,11 +154,13 @@ Item {
             }
         }
 
-        PC3.Button {
+        GlassButton {
             Layout.alignment: Qt.AlignRight
             visible: popup.hasPlayer && popup.player.canRaise
+            iconName: popup.hasPlayer ? popup.player.iconName : ""
             text: popup.hasPlayer ? "Open " + popup.player.identity : ""
-            icon.name: popup.hasPlayer ? popup.player.iconName : ""
+            iconSize: Kirigami.Units.iconSizes.small
+            isDark: popup.isDark
             onClicked: popup.player.Raise()
         }
     }

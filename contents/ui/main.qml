@@ -319,108 +319,17 @@ PlasmoidItem {
             y: dock.barY
             width: Math.round(Math.max(dock.layout.total, dock.baseIcon) + dock.pad * 2)
             height: dock.barHeight
-            readonly property real r: Math.min(dock.cfg.cornerRadius, height / 2)
 
-            // 0 = Glass, 1 = Frosted, 2 = Clear (no background), 3 = Solid
-            readonly property int style: dock.cfg.dockStyle
-            readonly property bool isGlass: style === 0
-            readonly property bool isFrosted: style === 1
-            readonly property bool hasBody: style !== 2
-            readonly property real bodyAlpha: style === 3 ? 1
-                : style === 1 ? Math.max(0.45, dock.cfg.glassOpacity) : dock.cfg.glassOpacity
-
-            // body + border + shadow
-            Kirigami.ShadowedRectangle {
+            GlassSurface {
                 anchors.fill: parent
-                radius: glass.r
-                color: !glass.hasBody ? "transparent"
-                    : glass.style === 3 ? Kirigami.Theme.backgroundColor
-                    : dock.isDark ? Qt.rgba(0.10, 0.10, 0.12, Math.min(1, glass.bodyAlpha + (glass.isGlass ? 0.12 : 0)))
-                    : Qt.rgba(1, 1, 1, glass.bodyAlpha)
-                border.width: dock.cfg.showBorder ? 1 : 0
-                border.color: glass.isFrosted ? Qt.rgba(1, 1, 1, dock.isDark ? 0.12 : 0.35)
-                    : Qt.rgba(1, 1, 1, dock.isDark ? 0.18 : 0.45)
-                shadow.size: dock.cfg.showShadow && glass.hasBody ? 22 : 0
-                shadow.yOffset: 6
-                shadow.color: Qt.rgba(0, 0, 0, dock.isDark ? 0.45 : 0.22)
-            }
-
-            // frosted: milky veil + fine grain
-            Rectangle {
-                visible: glass.isFrosted
-                anchors.fill: parent
-                anchors.margins: 1
-                radius: glass.r - 1
-                color: Qt.rgba(1, 1, 1, dock.isDark ? 0.06 : 0.20)
-            }
-            Kirigami.ShadowedTexture {
-                visible: glass.isFrosted
-                anchors.fill: parent
-                anchors.margins: 1
-                radius: glass.r - 1
-                color: "transparent"
-                opacity: dock.isDark ? 0.55 : 0.8
-                source: Image {
-                    source: Qt.resolvedUrl("../images/noise.png")
-                    fillMode: Image.Stretch
-                    smooth: false
-                    visible: false
-                }
-            }
-
-            // accent tint
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 1
-                radius: glass.r - 1
-                color: dock.accent
-                opacity: dock.cfg.glassAccentTint
-                visible: opacity > 0 && glass.hasBody
-            }
-
-            // vertical sheen (light from above) — glass only
-            Rectangle {
-                visible: glass.isGlass
-                anchors.fill: parent
-                anchors.margins: 1
-                radius: glass.r - 1
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, dock.isDark ? 0.16 : 0.38) }
-                    GradientStop { position: 0.45; color: Qt.rgba(1, 1, 1, dock.isDark ? 0.04 : 0.08) }
-                    GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0) }
-                }
-            }
-
-            // specular highlight on the top edge
-            Rectangle {
-                visible: glass.isGlass
-                anchors.top: parent.top
-                anchors.topMargin: 1
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width - glass.r * 1.4
-                height: 1
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: "transparent" }
-                    GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, dock.isDark ? 0.55 : 0.9) }
-                    GradientStop { position: 1.0; color: "transparent" }
-                }
-            }
-
-            // faint refracted glow on the bottom edge
-            Rectangle {
-                visible: glass.isGlass
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 1
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width - glass.r * 2
-                height: 1
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: "transparent" }
-                    GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.22) }
-                    GradientStop { position: 1.0; color: "transparent" }
-                }
+                style: dock.cfg.dockStyle
+                backgroundOpacity: dock.cfg.glassOpacity
+                radius: dock.cfg.cornerRadius
+                isDark: dock.isDark
+                accent: dock.accent
+                accentTint: dock.cfg.glassAccentTint
+                showBorder: dock.cfg.showBorder
+                showShadow: dock.cfg.showShadow
             }
         }
 
@@ -599,9 +508,9 @@ PlasmoidItem {
             }
         }
 
-        Component { id: playerPopupComponent; Widgets.PlayerPopup { player: mpris2Model.currentPlayer } }
-        Component { id: weatherPopupComponent; Widgets.WeatherPopup { weather: weatherData } }
-        Component { id: clockPopupComponent; Widgets.ClockPopup { now: root.now } }
+        Component { id: playerPopupComponent; Widgets.PlayerPopup { player: mpris2Model.currentPlayer; accent: dock.accent; isDark: dock.isDark } }
+        Component { id: weatherPopupComponent; Widgets.WeatherPopup { weather: weatherData; accent: dock.accent; isDark: dock.isDark } }
+        Component { id: clockPopupComponent; Widgets.ClockPopup { now: root.now; accent: dock.accent; isDark: dock.isDark } }
 
         property double widgetPopupHiddenAt: 0
         property Item widgetPopupAnchor: null
@@ -625,14 +534,17 @@ PlasmoidItem {
             id: widgetPopup
             type: PlasmaCore.Dialog.AppletPopup
             flags: Qt.WindowStaysOnTopHint
-            location: dock.cfg.launcherAnimation ? PlasmaCore.Types.BottomEdge : PlasmaCore.Types.Floating
+            location: PlasmaCore.Types.Floating   // animated by popupFrame instead of KWin
             hideOnWindowDeactivate: true
-            backgroundHints: PlasmaCore.Dialog.StandardBackground
+            // drawn by GlassSurface so the panels match the dock
+            backgroundHints: PlasmaCore.Dialog.NoBackground
             visible: false
 
             onVisibleChanged: {
                 if (!visible)
                     dock.widgetPopupHiddenAt = Date.now();
+                else
+                    popupFrame.playOpen();
                 Plasmoid.status = visible || launcher.visible ? PlasmaCore.Types.RequiresAttentionStatus
                                                               : PlasmaCore.Types.ActiveStatus;
             }
@@ -646,18 +558,64 @@ PlasmoidItem {
                 const a = dock.widgetPopupAnchor;
                 const p = a.mapToGlobal(a.width / 2, 0);
                 const top = dock.mapToGlobal(0, glass.y).y;
-                const w = widgetPopupLoader.width + margins.left + margins.right;
-                const h = widgetPopupLoader.height + margins.top + margins.bottom;
-                x = Math.round(p.x - w / 2);
-                y = Math.round(top - dock.cfg.launcherGap - h);
+                // the frame has a transparent margin for the shadow
+                x = Math.round(p.x - popupFrame.width / 2);
+                y = Math.round(top - dock.cfg.launcherGap - popupFrame.height + popupFrame.shadowMargin);
             }
 
-            mainItem: Loader {
-                id: widgetPopupLoader
-                width: item ? item.implicitWidth : 1
-                height: item ? item.implicitHeight : 1
-                focus: true
-                Keys.onEscapePressed: widgetPopup.visible = false
+            mainItem: Item {
+                id: popupFrame
+                readonly property int shadowMargin: 28
+                readonly property int padding: Kirigami.Units.gridUnit
+                width: widgetPopupLoader.width + (padding + shadowMargin) * 2
+                height: widgetPopupLoader.height + (padding + shadowMargin) * 2
+
+                // same open animation as the launcher
+                function playOpen() {
+                    if (!dock.cfg.launcherAnimation) {
+                        panel.opacity = 1; panel.scale = 1; rise.y = 0;
+                        return;
+                    }
+                    panel.opacity = 0; panel.scale = 0.94; rise.y = 14;
+                    openAnim.restart();
+                }
+                ParallelAnimation {
+                    id: openAnim
+                    NumberAnimation { target: panel; property: "opacity"; to: 1; duration: dock.cfg.launcherAnimationDuration; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: panel; property: "scale"; to: 1; duration: dock.cfg.launcherAnimationDuration; easing.type: Easing.OutBack; easing.overshoot: 1.2 }
+                    NumberAnimation { target: rise; property: "y"; to: 0; duration: dock.cfg.launcherAnimationDuration; easing.type: Easing.OutCubic }
+                }
+
+                Item {
+                    id: panel
+                    anchors.fill: parent
+                    anchors.margins: popupFrame.shadowMargin
+                    transformOrigin: Item.Bottom
+                    transform: Translate { id: rise }
+
+                    GlassSurface {
+                        anchors.fill: parent
+                        style: dock.cfg.dockStyle
+                        backgroundOpacity: dock.cfg.glassOpacity
+                        radius: dock.cfg.cornerRadius + 4
+                        isDark: dock.isDark
+                        accent: dock.accent
+                        accentTint: dock.cfg.glassAccentTint
+                        showBorder: dock.cfg.showBorder
+                        showShadow: dock.cfg.showShadow
+                        forceBody: true
+                    }
+
+                    Loader {
+                        id: widgetPopupLoader
+                        x: popupFrame.padding
+                        y: popupFrame.padding
+                        width: item ? item.implicitWidth : 1
+                        height: item ? item.implicitHeight : 1
+                        focus: true
+                        Keys.onEscapePressed: widgetPopup.visible = false
+                    }
+                }
             }
         }
 

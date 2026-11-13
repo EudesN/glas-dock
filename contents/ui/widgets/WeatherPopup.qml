@@ -10,6 +10,8 @@ Item {
     id: popup
 
     property var weather: null
+    property color accent: Kirigami.Theme.highlightColor
+    property bool isDark: true
     readonly property bool ready: weather !== null && weather.ready
 
     implicitWidth: Kirigami.Units.gridUnit * 22
@@ -52,26 +54,63 @@ Item {
                 }
             }
             Item { Layout.fillWidth: true }
-            ColumnLayout {
-                spacing: Kirigami.Units.smallSpacing
-                PC3.Label { text: popup.ready ? "Feels like " + popup.weather.current.feels + "°" : ""; font: Kirigami.Theme.smallFont; opacity: 0.7 }
-                PC3.Label { text: popup.ready ? "Humidity " + popup.weather.current.humidity + "%" : ""; font: Kirigami.Theme.smallFont; opacity: 0.7 }
-                PC3.Label { text: popup.ready ? "Wind " + popup.weather.current.wind + " " + popup.weather.current.windUnit : ""; font: Kirigami.Theme.smallFont; opacity: 0.7 }
-            }
         }
 
-        Kirigami.Separator { Layout.fillWidth: true; visible: popup.ready }
+        // details as glass chips
+        RowLayout {
+            visible: popup.ready
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            Repeater {
+                model: popup.ready ? [
+                    { icon: "temperature-normal", text: "Feels " + popup.weather.current.feels + "°" },
+                    { icon: "raindrop", text: popup.weather.current.humidity + "%" },
+                    { icon: "speedometer", text: popup.weather.current.wind + " " + popup.weather.current.windUnit }
+                ] : []
+                delegate: Rectangle {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    implicitHeight: chipRow.implicitHeight + Kirigami.Units.smallSpacing * 2
+                    radius: height / 2
+                    color: popup.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.4)
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, popup.isDark ? 0.10 : 0.45)
+                    RowLayout {
+                        id: chipRow
+                        anchors.centerIn: parent
+                        spacing: Kirigami.Units.smallSpacing
+                        Kirigami.Icon {
+                            Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                            Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                            source: modelData.icon
+                        }
+                        PC3.Label { text: modelData.text; font: Kirigami.Theme.smallFont }
+                    }
+                }
+            }
+        }
 
         // forecast
         RowLayout {
             visible: popup.ready
             Layout.fillWidth: true
-            spacing: 0
+            spacing: Kirigami.Units.smallSpacing
             Repeater {
                 model: popup.ready ? popup.weather.daily.slice(1, 6) : []
-                delegate: ColumnLayout {
+                delegate: Rectangle {
+                    id: dayCard
                     required property var modelData
                     Layout.fillWidth: true
+                    implicitHeight: dayCol.implicitHeight + Kirigami.Units.largeSpacing * 2
+                    radius: Kirigami.Units.cornerRadius * 2
+                    color: popup.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.4)
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, popup.isDark ? 0.10 : 0.45)
+
+                ColumnLayout {
+                    id: dayCol
+                    readonly property var modelData: dayCard.modelData
+                    anchors.centerIn: parent
                     spacing: Kirigami.Units.smallSpacing
                     PC3.Label {
                         Layout.alignment: Qt.AlignHCenter
@@ -86,9 +125,16 @@ Item {
                     }
                     PC3.Label {
                         Layout.alignment: Qt.AlignHCenter
-                        text: modelData.max + "° / " + modelData.min + "°"
-                        font: Kirigami.Theme.smallFont
+                        text: modelData.max + "°"
+                        font.weight: Font.DemiBold
                     }
+                    PC3.Label {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: modelData.min + "°"
+                        font: Kirigami.Theme.smallFont
+                        opacity: 0.6
+                    }
+                }
                 }
             }
         }
