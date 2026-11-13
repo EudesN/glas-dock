@@ -793,8 +793,11 @@ PlasmoidItem {
                 appletInterface: root
                 iconSize: dock.cfg.launcherIconSize
                 style: dock.cfg.launcherStyle
-                blurBehind: dock.blurOn || dock.cfg.launcherStyle === 4
-                frost: dock.cfg.blurFrost
+                // launcherBlur: 0 = same as the dock, 1 = on, 2 = off
+                blurBehind: dock.cfg.launcherBlur === 1 ? true
+                          : dock.cfg.launcherBlur === 2 ? false
+                          : (dock.blurOn || dock.cfg.launcherStyle === 4)
+                frost: dock.cfg.launcherBlur === 0 ? dock.cfg.blurFrost : dock.cfg.launcherFrost
                 radius: dock.cfg.cornerRadius + 4
                 accent: dock.accent
                 accentTint: dock.cfg.glassAccentTint

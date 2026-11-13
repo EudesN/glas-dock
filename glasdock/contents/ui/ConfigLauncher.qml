@@ -3,6 +3,7 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
+import org.kde.plasma.plasma5support as P5Support
 
 // Glasdock settings — Launcher
 KCM.SimpleKCM {
@@ -10,6 +11,8 @@ KCM.SimpleKCM {
     property alias cfg_appsButtonZoom: appsButtonZoom.checked
     // 4 = the old "Blur" style: shown as Glass (the launcher keeps its blur)
     property int cfg_launcherStyle
+    property alias cfg_launcherBlur: launcherBlur.currentIndex
+    property alias cfg_launcherFrost: launcherFrost.value
     property alias cfg_launcherOpacity: launcherOpacity.value
     property alias cfg_launcherIconSize: launcherIconSize.value
     property alias cfg_launcherWidth: launcherWidth.value
@@ -54,7 +57,45 @@ KCM.SimpleKCM {
             wrapMode: Text.WordWrap
             font: Kirigami.Theme.smallFont
             opacity: 0.7
-            text: "Same look as the dock. Blur and frost follow the dock setting (Appearance → Blur)."
+            text: "Same look as the dock."
+        }
+
+        // ---- blur behind the launcher (org.glasdock.blur helper plugin)
+        QQC2.ComboBox {
+            id: launcherBlur
+            Kirigami.FormData.label: "Blur behind:"
+            model: ["Same as the dock", "On", "Off"]
+        }
+        RowLayout {
+            Kirigami.FormData.label: "Frost:"
+            enabled: launcherBlur.currentIndex === 1
+            QQC2.Slider { id: launcherFrost; from: 0.0; to: 1.0; stepSize: 0.01 }
+            QQC2.Label { text: Math.round(launcherFrost.value * 100) + "%" }
+        }
+        RowLayout {
+            Kirigami.FormData.label: "Blur strength:"
+            enabled: launcherBlur.currentIndex !== 2
+            QQC2.Button {
+                text: "Desktop Effects…"
+                icon.name: "preferences-desktop-effects"
+                onClicked: runner.connectSource("systemsettings kcm_kwin_effects")
+            }
+        }
+        QQC2.Label {
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 22
+            wrapMode: Text.WordWrap
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            text: blurProbe.status === Loader.Error
+                ? "The blur helper is not installed: run ./install.sh from the Glasdock folder, then log out and back in once."
+                : "\"Same as the dock\" uses the dock's blur and frost (Appearance → Blur). Lower the launcher opacity to see more of the blur."
+        }
+        Loader { id: blurProbe; visible: false; source: Qt.resolvedUrl("shared/BlurLayer.qml") }
+        P5Support.DataSource {
+            id: runner
+            engine: "executable"
+            connectedSources: []
+            onNewData: sourceName => disconnectSource(sourceName)
         }
         QQC2.SpinBox {
             id: launcherIconSize
