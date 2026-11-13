@@ -207,7 +207,60 @@ PlasmoidItem {
         readonly property real widgetsWidth: widgetWidths.length === 0 ? 0
             : sepGap + widgetWidths.reduce((a, b) => a + b, 0) + spacing * (widgetWidths.length - 1)
 
-        readonly property real restWidth: slots * baseIcon + Math.max(0, slots - 1) * spacing + widgetsWidth
+        // --- separators: a vertical line after chosen icons (right-click an icon →
+        // "Add Separator After"). Stored as the launcher URLs of the icons they
+        // follow ("@apps" = after the apps button), so they move with the icons.
+        readonly property real separatorGap: Math.max(spacing, 6) * 2 + 1
+        property int modelRevision: 0      // bumped when tasks move/change
+        Connections {
+            target: tasksModel
+            function onRowsMoved() { dock.modelRevision++; }
+            function onRowsInserted() { dock.modelRevision++; }
+            function onRowsRemoved() { dock.modelRevision++; }
+            function onModelReset() { dock.modelRevision++; }
+            function onDataChanged() { dock.modelRevision++; }
+        }
+        function launcherKeyOf(row) {
+            const url = tasksModel.data(tasksModel.makeModelIndex(row), TaskManager.AbstractTasksModel.LauncherUrlWithoutIcon);
+            return url ? url.toString() : "";
+        }
+        // gap after each slot (0 or separatorGap)
+        readonly property var gapAfter: {
+            modelRevision;   // dependency
+            const seps = cfg.separators || [];
+            const gaps = [];
+            for (let i = 0; i < slots; i++) {
+                const key = (offset === 1 && i === 0) ? "@apps" : launcherKeyOf(i - offset);
+                gaps.push(i < slots - 1 && key !== "" && seps.indexOf(key) !== -1 ? separatorGap : 0);
+            }
+            return gaps;
+        }
+        // resting x of each slot's left edge, relative to the first one
+        readonly property var restOffsets: {
+            const r = [];
+            let x = 0;
+            for (let i = 0; i < slots; i++) {
+                r.push(x);
+                x += baseIcon + spacing + (gapAfter[i] || 0);
+            }
+            return r;
+        }
+        readonly property real gapsTotal: gapAfter.reduce((a, g) => a + g, 0)
+
+        function hasSeparatorAfter(key) {
+            return (cfg.separators || []).indexOf(key) !== -1;
+        }
+        function toggleSeparatorAfter(key) {
+            const seps = (cfg.separators || []).slice();
+            const i = seps.indexOf(key);
+            if (i === -1)
+                seps.push(key);
+            else
+                seps.splice(i, 1);
+            cfg.separators = seps;
+        }
+
+        readonly property real restWidth: slots * baseIcon + Math.max(0, slots - 1) * spacing + gapsTotal + widgetsWidth
         readonly property real zoomSlack: (maxZoom - 1) * baseIcon * cfg.zoomRange * 1.15
 
         // Fixed width (with room for the zoom) so the panel does not resize on
@@ -362,7 +415,12 @@ PlasmoidItem {
         function reorderTo(from, px) {
             const b = baseIcon, sp = spacing;
             const left0 = (width - restWidth) / 2;
-            const slotAt = Math.round((px - left0 - b / 2) / (b + sp));
+            // nearest resting slot (separators make the steps uneven)
+            let slotAt = 0, best = Infinity;
+            for (let i = 0; i < slots; i++) {
+                const d = Math.abs(px - (left0 + restOffsets[i] + b / 2));
+                if (d < best) { best = d; slotAt = i; }
+            }
             const to = Math.max(0, Math.min(count - 1, slotAt - offset));
             if (to !== from)
                 tasksModel.move(from, to);
@@ -416,7 +474,7 @@ PlasmoidItem {
             const R = b * cfg.zoomRange;
             const z = (maxZoom - 1) * zoom;          // 0..maxZoom-1, animated
             const left0 = (width - restWidth) / 2;
-            const center = i => left0 + i * (b + sp) + b / 2;
+            const center = i => left0 + (restOffsets[i] || 0) + b / 2;
             const g = d => d < R ? (Math.cos(Math.PI * d / R) + 1) / 2 : 0;
             const zoomable = i => !(i === 0 && offset === 1 && !cfg.appsButtonZoom);
 
@@ -467,16 +525,22 @@ PlasmoidItem {
                 leftExtra += extras[i] * Math.max(0, Math.min(1, (mouseX - restX) / b));
                 sizes.push(s);
             }
-            const iconsTotal = n * b + sumE + sp * Math.max(0, n - 1);
+            const iconsTotal = n * b + sumE + sp * Math.max(0, n - 1) + gapsTotal;
             const total = iconsTotal + widgetsWidth;
             const x0 = cfg.centeredZoom ? (width - total) / 2 : left0 - leftExtra;
             let xs = [], x = x0;
+            let seps = [];       // x of each separator line
             for (let i = 0; i < n; i++) {
                 xs.push(x);
                 x += sizes[i] + sp;
+                const gap = gapAfter[i] || 0;
+                if (gap > 0) {
+                    seps.push(x - sp / 2 + gap / 2);
+                    x += gap;
+                }
             }
             const iconsEnd = x0 + iconsTotal;
-            return { sizes: sizes, xs: xs, total: total, x0: x0,
+            return { sizes: sizes, xs: xs, total: total, x0: x0, separators: seps,
                      iconsEnd: iconsEnd, widgetsX: iconsEnd + sepGap };
         }
 
@@ -504,6 +568,19 @@ PlasmoidItem {
                 accentTint: dock.cfg.glassAccentTint
                 showBorder: dock.cfg.showBorder
                 showShadow: dock.cfg.showShadow
+            }
+        }
+
+        // ----------------------------------------------------- separators
+        Repeater {
+            model: dock.layout.separators
+            delegate: Rectangle {
+                required property real modelData
+                x: Math.round(modelData)
+                y: dock.barY + dock.barHeight * 0.2
+                width: 1
+                height: dock.barHeight * 0.6
+                color: Qt.rgba(1, 1, 1, dock.isDark ? 0.22 : 0.55)
             }
         }
 
@@ -560,7 +637,32 @@ PlasmoidItem {
                 anchors.topMargin: Math.min(0, dock.barY - appsButton.y)
                 anchors.bottomMargin: -(dock.barY + dock.barHeight - appsButton.y - appsButton.height)
                 hoverEnabled: true
-                onClicked: dock.toggleLauncher()
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: mouse => {
+                    if (mouse.button === Qt.RightButton) {
+                        dock.hidePreview();
+                        appsMenu.openRelative();
+                    } else {
+                        dock.toggleLauncher();
+                    }
+                }
+            }
+
+            PlasmaExtras.Menu {
+                id: appsMenu
+                visualParent: appsButton
+                placement: PlasmaExtras.Menu.TopPosedLeftAlignedPopup
+                PlasmaExtras.MenuItem {
+                    readonly property bool has: dock.hasSeparatorAfter("@apps")
+                    text: has ? "Remove Separator After" : "Add Separator After"
+                    icon: has ? "edit-delete-remove" : "distribute-horizontal-x"
+                    onClicked: dock.toggleSeparatorAfter("@apps")
+                }
+                PlasmaExtras.MenuItem {
+                    text: "Configure Glasdock…"
+                    icon: "configure"
+                    onClicked: Plasmoid.internalAction("configure").trigger()
+                }
             }
         }
 
@@ -945,7 +1047,7 @@ PlasmoidItem {
                     // resting position, used by KWin's minimize animation
                     if (!dock || !task || index < 0)
                         return; // delegate already destroyed (model changed)
-                    const restX = (dock.width - dock.restWidth) / 2 + slot * (dock.baseIcon + dock.spacing);
+                    const restX = (dock.width - dock.restWidth) / 2 + (dock.restOffsets[slot] || 0);
                     const p = dock.mapToGlobal(restX, dock.barY + dock.pad);
                     tasksModel.requestPublishDelegateGeometry(modelIndex(),
                         Qt.rect(p.x, p.y, dock.baseIcon, dock.baseIcon), task);
@@ -1225,6 +1327,13 @@ PlasmoidItem {
                             else
                                 tasksModel.requestAddLauncher(menu.launcherUrl);
                         }
+                    }
+                    PlasmaExtras.MenuItem {
+                        readonly property bool has: dock.hasSeparatorAfter(menu.launcherUrl.toString())
+                        text: has ? "Remove Separator After" : "Add Separator After"
+                        icon: has ? "edit-delete-remove" : "distribute-horizontal-x"
+                        visible: menu.launcherUrl !== "" && task.slot < dock.slots - 1
+                        onClicked: dock.toggleSeparatorAfter(menu.launcherUrl.toString())
                     }
                     PlasmaExtras.MenuItem { separator: true }
                     PlasmaExtras.MenuItem {
