@@ -170,6 +170,8 @@ PlasmoidItem {
             isDark: root.isDark
             accent: root.accent
             animated: root.cfg.popupAnimation
+            blurBehind: root.cfg.popupBlur || root.cfg.popupStyle === 4
+            frost: root.cfg.popupFrost
             sourceComponent: Shared.PlayerPopup {
                 player: root.player
                 accent: root.accent

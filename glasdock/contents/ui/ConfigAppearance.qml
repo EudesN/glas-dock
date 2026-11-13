@@ -3,10 +3,14 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
+import org.kde.plasma.plasma5support as P5Support
 
 // Glasdock settings — Appearance
 KCM.SimpleKCM {
-    property alias cfg_dockStyle: dockStyle.currentIndex
+    // style 4 (the old "Blur" style) shows as Glass with blur on
+    property int cfg_dockStyle
+    property bool cfg_blurBehind
+    property alias cfg_blurFrost: blurFrost.value
     property alias cfg_glassOpacity: glassOpacity.value
     property alias cfg_showBorder: showBorder.checked
     property alias cfg_showShadow: showShadow.checked
@@ -27,15 +31,13 @@ KCM.SimpleKCM {
         QQC2.ComboBox {
             id: dockStyle
             Kirigami.FormData.label: "Style:"
-            model: ["Glass", "Frosted", "Clear (no background)", "Solid", "Blur (real blur)"]
-        }
-        QQC2.Label {
-            visible: dockStyle.currentIndex === 4
-            Layout.maximumWidth: Kirigami.Units.gridUnit * 22
-            wrapMode: Text.WordWrap
-            font: Kirigami.Theme.smallFont
-            opacity: 0.7
-            text: "Blur uses Plasma's own background, so the desktop behind is really blurred and the corner shape follows the Plasma theme. The panel becomes as tall as the bar (floating), so icon zoom and hover names are turned off."
+            model: ["Glass", "Frosted", "Clear (no background)", "Solid"]
+            currentIndex: cfg_dockStyle === 4 ? 0 : cfg_dockStyle
+            onActivated: index => {
+                if (cfg_dockStyle === 4)
+                    cfg_blurBehind = true;
+                cfg_dockStyle = index;
+            }
         }
         RowLayout {
             Kirigami.FormData.label: "Opacity:"
@@ -57,9 +59,58 @@ KCM.SimpleKCM {
         }
         QQC2.CheckBox {
             id: showShadow
-            enabled: dockStyle.currentIndex !== 2 && dockStyle.currentIndex !== 4
+            enabled: dockStyle.currentIndex !== 2
             text: "Shadow"
         }
+        // ---- real blur (org.glasdock.blur helper plugin)
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+            Kirigami.FormData.label: "Blur"
+        }
+        QQC2.CheckBox {
+            id: blurBehind
+            Kirigami.FormData.label: "Blur:"
+            text: "Blur the desktop behind the glass (dock, launcher, panels, previews)"
+            checked: cfg_blurBehind || cfg_dockStyle === 4
+            onToggled: {
+                cfg_blurBehind = checked;
+                if (cfg_dockStyle === 4)
+                    cfg_dockStyle = 0;
+            }
+        }
+        RowLayout {
+            Kirigami.FormData.label: "Frost:"
+            enabled: blurBehind.checked
+            QQC2.Slider { id: blurFrost; from: 0.0; to: 1.0; stepSize: 0.01 }
+            QQC2.Label { text: Math.round(blurFrost.value * 100) + "%" }
+        }
+        RowLayout {
+            Kirigami.FormData.label: "Blur strength:"
+            enabled: blurBehind.checked
+            QQC2.Button {
+                text: "Desktop Effects…"
+                icon.name: "preferences-desktop-effects"
+                onClicked: runner.connectSource("systemsettings kcm_kwin_effects")
+            }
+        }
+        QQC2.Label {
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 22
+            wrapMode: Text.WordWrap
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            text: blurProbe.status === Loader.Error
+                ? "The blur helper is not installed: run ./install.sh from the Glasdock folder, then log out and back in once."
+                : "Frost adds a milky, grainy layer over the blur. How strongly KWin blurs is a system-wide setting: Desktop Effects → Blur. Lower the opacity to see more of the blur."
+        }
+        // probes whether the helper plugin can be loaded
+        Loader { id: blurProbe; visible: false; source: Qt.resolvedUrl("shared/BlurLayer.qml") }
+        P5Support.DataSource {
+            id: runner
+            engine: "executable"
+            connectedSources: []
+            onNewData: sourceName => disconnectSource(sourceName)
+        }
+
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
             Kirigami.FormData.label: "Colors"

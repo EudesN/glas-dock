@@ -8,7 +8,8 @@ import org.kde.kcmutils as KCM
 KCM.SimpleKCM {
     property alias cfg_showAppsButton: showAppsButton.checked
     property alias cfg_appsButtonZoom: appsButtonZoom.checked
-    property alias cfg_launcherStyle: launcherStyle.currentIndex
+    // 4 = the old "Blur" style: shown as Glass (the launcher keeps its blur)
+    property int cfg_launcherStyle
     property alias cfg_launcherOpacity: launcherOpacity.value
     property alias cfg_launcherIconSize: launcherIconSize.value
     property alias cfg_launcherWidth: launcherWidth.value
@@ -39,21 +40,21 @@ KCM.SimpleKCM {
         QQC2.ComboBox {
             id: launcherStyle
             Kirigami.FormData.label: "Style:"
-            model: ["Glass", "Frosted", "Clear", "Solid", "Blur (real blur)"]
+            model: ["Glass", "Frosted", "Clear", "Solid"]
+            currentIndex: cfg_launcherStyle === 4 ? 0 : cfg_launcherStyle
+            onActivated: index => cfg_launcherStyle = index
         }
         RowLayout {
             Kirigami.FormData.label: "Opacity:"
             QQC2.Slider { id: launcherOpacity; from: 0.0; to: 1.0; stepSize: 0.01 }
-            QQC2.Label { text: Math.round(launcherOpacity.value * 100) + "%" + (launcherStyle.currentIndex === 4 && launcherOpacity.value === 0 ? " (theme default)" : "") }
+            QQC2.Label { text: Math.round(launcherOpacity.value * 100) + "%"  }
         }
         QQC2.Label {
             Layout.maximumWidth: Kirigami.Units.gridUnit * 22
             wrapMode: Text.WordWrap
             font: Kirigami.Theme.smallFont
             opacity: 0.7
-            text: launcherStyle.currentIndex === 4
-                  ? "Blur keeps Plasma's blurred background; the opacity slider adds tint on top (0% = theme, 100% = solid)."
-                  : "Same look as the dock style; the opacity slider sets how see-through it is. Only Blur blurs the desktop behind."
+            text: "Same look as the dock. Blur and frost follow the dock setting (Appearance → Blur)."
         }
         QQC2.SpinBox {
             id: launcherIconSize

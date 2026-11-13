@@ -54,7 +54,6 @@ PlasmoidItem {
         property: "backgroundHints"
         value: PlasmaCore.Types.NoBackground
         when: Plasmoid.configuration.transparentPanel
-              && Plasmoid.configuration.dockStyle !== 4   // Blur uses the panel background
               && Plasmoid.formFactor === PlasmaCore.Types.Horizontal
         restoreMode: Binding.RestoreBindingOrValue
     }
@@ -179,13 +178,13 @@ PlasmoidItem {
         readonly property int count: taskRepeater.count
         readonly property int offset: cfg.showAppsButton ? 1 : 0
         readonly property int slots: count + offset
-        // "Blur" style: the blurred background is the Plasma panel itself, so the
-        // panel is only as tall as the bar and icons don't zoom out of it
-        readonly property bool blurStyle: cfg.dockStyle === 4
-        readonly property real maxZoom: blurStyle ? 1 : Math.max(1, cfg.maxZoom)
-        readonly property int bottomGap: blurStyle ? 0 : cfg.bottomMargin
+        // real blur behind the glass (blur helper plugin); the old "Blur" style
+        // (4) means Glass with blur
+        readonly property bool blurOn: cfg.blurBehind || cfg.dockStyle === 4
+        readonly property real maxZoom: Math.max(1, cfg.maxZoom)
+        readonly property int bottomGap: cfg.bottomMargin
         readonly property real pad: Math.round(cfg.iconSize * 0.18)
-        readonly property real labelSpace: cfg.showLabels && !blurStyle ? Kirigami.Units.gridUnit * 2 : 0
+        readonly property real labelSpace: cfg.showLabels ? Kirigami.Units.gridUnit * 2 : 0
 
         // Resting icon size: the configured one, reduced if the panel is not tall
         // enough for the zoomed icon to fit.
@@ -213,7 +212,7 @@ PlasmoidItem {
 
         // Fixed width (with room for the zoom) so the panel does not resize on
         // every mouse move.
-        Layout.minimumWidth: restWidth + pad * 2 + zoomSlack + (blurStyle ? 0 : 8)
+        Layout.minimumWidth: restWidth + pad * 2 + zoomSlack + 8
         Layout.preferredWidth: Layout.minimumWidth
         Layout.maximumWidth: Layout.minimumWidth
         Layout.fillHeight: true
@@ -221,10 +220,7 @@ PlasmoidItem {
         // Panel thickness needed for the configured icon size at full zoom.
         // With "autoPanelHeight" the panel is resized to it, so the icon size
         // setting is not capped by the current panel height.
-        readonly property int neededHeight: blurStyle
-            ? Math.ceil(cfg.iconSize + pad * 2)
-            : Math.ceil(cfg.bottomMargin + pad + cfg.iconSize * maxZoom + labelSpace + 4)
-        onBlurStyleChanged: panelResizeTimer.restart()
+        readonly property int neededHeight: Math.ceil(cfg.bottomMargin + pad + cfg.iconSize * maxZoom + labelSpace + 4)
         onNeededHeightChanged: panelResizeTimer.restart()
         onHeightChanged: panelResizeTimer.restart()
         Timer {
@@ -234,11 +230,11 @@ PlasmoidItem {
                 if (!dock.cfg.autoPanelHeight || Plasmoid.formFactor !== PlasmaCore.Types.Horizontal
                         || !Plasmoid.containment || dock.height <= 0)
                     return;
-                // Blur: a floating panel gives the bar its gap from the screen edge
+                if (Math.abs(dock.height - dock.neededHeight) < 2)
+                    return;
                 executable.run("qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
-                    + "'var p = panelById(" + Plasmoid.containment.id + "); if (p) { "
-                    + "if (Math.abs(p.height - " + dock.neededHeight + ") >= 2) p.height = " + dock.neededHeight + "; "
-                    + "if (p.floating !== " + dock.blurStyle + ") p.floating = " + dock.blurStyle + "; }'");
+                    + "'var p = panelById(" + Plasmoid.containment.id + "); if (p) p.height = "
+                    + dock.neededHeight + ";'");
             }
         }
 
@@ -343,6 +339,8 @@ PlasmoidItem {
             accentTint: dock.cfg.glassAccentTint
             showBorder: dock.cfg.showBorder
             showShadow: dock.cfg.showShadow
+            blurBehind: dock.blurOn
+            frost: dock.cfg.blurFrost
             onHoveredChanged: hovered ? previewHideTimer.stop() : dock.previewLeave()
             onActivateRequested: (row, child) => {
                 tasksModel.requestActivate(tasksModel.makeModelIndex(row, child));
@@ -489,13 +487,15 @@ PlasmoidItem {
             // separately made the right edge flicker by a pixel)
             readonly property real leftEdge: Math.round(dock.layout.x0 - dock.pad)
             readonly property real rightEdge: Math.round(dock.layout.x0 + Math.max(dock.layout.total, dock.baseIcon) + dock.pad)
-            x: dock.blurStyle ? 0 : leftEdge
+            x: leftEdge
             y: dock.barY
-            width: dock.blurStyle ? dock.width : rightEdge - leftEdge
+            width: rightEdge - leftEdge
             height: dock.barHeight
 
             Widgets.GlassSurface {
                 anchors.fill: parent
+                blurBehind: dock.blurOn
+                frost: dock.cfg.blurFrost
                 style: dock.cfg.dockStyle
                 backgroundOpacity: dock.cfg.glassOpacity
                 radius: dock.cfg.cornerRadius
@@ -530,7 +530,7 @@ PlasmoidItem {
             }
 
             Rectangle {
-                opacity: dock.cfg.showLabels && !dock.blurStyle && appsMouse.containsMouse ? 1 : 0
+                opacity: dock.cfg.showLabels && appsMouse.containsMouse ? 1 : 0
                 visible: opacity > 0
                 Behavior on opacity { NumberAnimation { duration: 140 } }
                 width: appsLabel.implicitWidth + Kirigami.Units.largeSpacing * 2
@@ -599,14 +599,12 @@ PlasmoidItem {
             // With the theme background, BottomEdge lets KWin's "Sliding popups"
             // effect slide the whole window (frame + blur) up from the dock. The
             // custom glass background is animated entirely by Launcher.qml.
-            readonly property bool themeBlur: dock.cfg.launcherStyle === 4
-            readonly property bool kwinSlides: dock.cfg.launcherAnimation && themeBlur
-            location: kwinSlides ? PlasmaCore.Types.BottomEdge : PlasmaCore.Types.Floating
+            readonly property bool kwinSlides: false   // animated by Launcher.qml
+            location: PlasmaCore.Types.Floating
             // closing on deactivation is animated (onActiveChanged) instead
             hideOnWindowDeactivate: !dock.cfg.launcherAnimation
             onActiveChanged: if (!active && visible && dock.launcherView) dock.launcherView.playClose()
-            backgroundHints: !themeBlur ? PlasmaCore.Dialog.NoBackground
-                                                               : PlasmaCore.Dialog.StandardBackground
+            backgroundHints: PlasmaCore.Dialog.NoBackground
             visible: false
 
             onVisibleChanged: {
@@ -638,6 +636,8 @@ PlasmoidItem {
                 appletInterface: root
                 iconSize: dock.cfg.launcherIconSize
                 style: dock.cfg.launcherStyle
+                blurBehind: dock.blurOn || dock.cfg.launcherStyle === 4
+                frost: dock.cfg.blurFrost
                 radius: dock.cfg.cornerRadius + 4
                 accent: dock.accent
                 accentTint: dock.cfg.glassAccentTint
@@ -756,8 +756,7 @@ PlasmoidItem {
             onActiveChanged: if (!active && visible) popupFrame.playClose()
             // drawn by GlassSurface so the panels match the dock; Blur style uses
             // Plasma's own (blurred) background instead
-            readonly property bool themeBlur: dock.cfg.dockStyle === 4
-            backgroundHints: themeBlur ? PlasmaCore.Dialog.StandardBackground : PlasmaCore.Dialog.NoBackground
+            backgroundHints: PlasmaCore.Dialog.NoBackground
             visible: false
 
             onVisibleChanged: {
@@ -783,15 +782,14 @@ PlasmoidItem {
                 const top = dock.mapToGlobal(0, glass.y).y;
                 // the frame has a transparent margin for the shadow (or Plasma's
                 // frame margins in Blur style)
-                const w = popupFrame.width + (themeBlur ? margins.left + margins.right : 0);
-                const h = popupFrame.height + (themeBlur ? margins.top + margins.bottom : 0);
+                const w = popupFrame.width, h = popupFrame.height;
                 x = Math.round(p.x - w / 2);
                 y = Math.round(top - dock.cfg.launcherGap - h + popupFrame.shadowMargin);
             }
 
             mainItem: Item {
                 id: popupFrame
-                readonly property int shadowMargin: widgetPopup.themeBlur ? 0 : 28
+                readonly property int shadowMargin: 28
                 readonly property int padding: Kirigami.Units.gridUnit
                 width: widgetPopupLoader.width + (padding + shadowMargin) * 2
                 height: widgetPopupLoader.height + (padding + shadowMargin) * 2
@@ -873,6 +871,8 @@ PlasmoidItem {
 
                     Widgets.GlassSurface {
                         anchors.fill: parent
+                        blurBehind: dock.blurOn
+                        frost: dock.cfg.blurFrost
                         style: dock.cfg.dockStyle
                         backgroundOpacity: dock.cfg.glassOpacity
                         radius: dock.cfg.cornerRadius + 4
@@ -1095,8 +1095,7 @@ PlasmoidItem {
                 // app name on hover
                 Rectangle {
                     id: label
-                    // (no room for names above a bar-sized Blur panel)
-                    readonly property bool shown: dock.cfg.showLabels && !dock.blurStyle && mouse.containsMouse
+                    readonly property bool shown: dock.cfg.showLabels && mouse.containsMouse
                                                   && !(dock.previewOpen && dock.previewTask === task)
                                                   && !dock.contextMenuOpen && !dock.dragging
                     opacity: shown ? 1 : 0

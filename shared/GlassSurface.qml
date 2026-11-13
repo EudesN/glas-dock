@@ -1,9 +1,10 @@
 /*
  * Glasdock — the glass look shared by the dock, its panels and the panel widgets.
- * style: 0 = Glass, 1 = Frosted, 2 = Clear (no background), 3 = Solid,
- *        4 = Blur: the window/panel draws Plasma's own background (with real
- *            KWin blur) and this item draws nothing, because Plasma's frame
- *            has its own shape and anything on top would not line up with it
+ * style: 0 = Glass, 1 = Frosted, 2 = Clear (no background), 3 = Solid
+ *        (4, the old "Blur" style, is treated as Glass with blurBehind on)
+ * blurBehind: real KWin blur of the desktop behind the surface, in its exact
+ *        shape, through the org.glasdock.blur helper plugin (if installed)
+ * frost: 0..1 milky veil + grain on top, to make the blur look softer/heavier
  */
 import QtQuick
 import org.kde.kirigami as Kirigami
@@ -12,6 +13,10 @@ Item {
     id: surface
 
     property int style: 0
+    property bool blurBehind: false
+    property real frost: 0
+    // true once the blur helper plugin is loaded (false when not installed)
+    readonly property bool blurAvailable: blurLoader.status === Loader.Ready
     property real backgroundOpacity: 0.22
     property real radius: 20
     property bool isDark: true
@@ -22,14 +27,24 @@ Item {
     // panels keep a minimum body so their text stays readable in "Clear"
     property bool forceBody: false
 
-    readonly property bool isBlur: style === 4
-    readonly property bool isGlass: style === 0
-    readonly property bool isFrosted: style === 1
-    readonly property bool hasBody: (style !== 2 || forceBody) && !isBlur
-    readonly property real bodyAlpha: style === 3 ? 1
-        : style === 1 ? Math.max(0.45, backgroundOpacity)
-        : style === 2 ? 0.55
+    readonly property int st: style === 4 ? 0 : style
+    readonly property bool blurOn: blurBehind || style === 4
+    readonly property bool isGlass: st === 0
+    readonly property bool isFrosted: st === 1
+    readonly property bool hasBody: st !== 2 || forceBody
+    readonly property real bodyAlpha: st === 3 ? 1
+        : st === 1 ? Math.max(0.45, backgroundOpacity)
+        : st === 2 ? (blurOn ? 0.25 : 0.55)
         : backgroundOpacity
+
+    // real blur behind (first, so everything else is drawn over it)
+    Loader {
+        id: blurLoader
+        anchors.fill: parent
+        active: surface.blurOn
+        source: Qt.resolvedUrl("BlurLayer.qml")
+        onLoaded: item.radius = Qt.binding(() => surface.r)
+    }
     readonly property real r: Math.min(radius, height / 2)
 
     // body + border + shadow
@@ -37,10 +52,10 @@ Item {
         anchors.fill: parent
         radius: surface.r
         color: !surface.hasBody ? "transparent"
-            : surface.style === 3 ? Kirigami.Theme.backgroundColor
+            : surface.st === 3 ? Kirigami.Theme.backgroundColor
             : surface.isDark ? Qt.rgba(0.10, 0.10, 0.12, Math.min(1, surface.bodyAlpha + (surface.isGlass ? 0.12 : 0)))
             : Qt.rgba(1, 1, 1, surface.bodyAlpha)
-        border.width: surface.showBorder && !surface.isBlur ? 1 : 0
+        border.width: surface.showBorder ? 1 : 0
         border.color: surface.isFrosted ? Qt.rgba(1, 1, 1, surface.isDark ? 0.12 : 0.35)
             : Qt.rgba(1, 1, 1, surface.isDark ? 0.18 : 0.45)
         shadow.size: surface.showShadow && surface.hasBody ? 22 : 0
@@ -63,6 +78,30 @@ Item {
         radius: surface.r - 1
         color: "transparent"
         opacity: surface.isDark ? 0.55 : 0.8
+        source: Image {
+            source: Qt.resolvedUrl("images/noise.png")
+            fillMode: Image.Stretch
+            smooth: false
+            visible: false
+        }
+    }
+
+    // frost veil (blur look): milky layer + grain, amount = frost
+    Rectangle {
+        visible: surface.frost > 0
+        anchors.fill: parent
+        anchors.margins: 1
+        radius: surface.r - 1
+        color: surface.isDark ? Qt.rgba(0.85, 0.85, 0.9, surface.frost * 0.14)
+                              : Qt.rgba(1, 1, 1, surface.frost * 0.45)
+    }
+    Kirigami.ShadowedTexture {
+        visible: surface.frost > 0
+        anchors.fill: parent
+        anchors.margins: 1
+        radius: surface.r - 1
+        color: "transparent"
+        opacity: surface.frost * (surface.isDark ? 0.5 : 0.7)
         source: Image {
             source: Qt.resolvedUrl("images/noise.png")
             fillMode: Image.Stretch

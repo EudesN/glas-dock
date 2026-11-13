@@ -17,12 +17,11 @@ Item {
     property var appletInterface
     property int iconSize: Kirigami.Units.iconSizes.large
 
-    // Background style, same list as the dock: 0 Glass, 1 Frosted, 2 Clear,
-    // 3 Solid, 4 Blur. Blur = Plasma's (KWin-blurred) dialog frame plus an
-    // optional tint (backgroundOpacity); the others draw the dock's glass
-    // surface (no blur) with backgroundOpacity as its opacity.
-    property int style: 4
-    readonly property bool customBackground: style !== 4
+    // Background: the dock's glass (style 0 Glass, 1 Frosted, 2 Clear, 3 Solid;
+    // 4, the old "Blur", = Glass with blur), optionally with real blur behind.
+    property int style: 0
+    property bool blurBehind: false
+    property real frost: 0
     property real backgroundOpacity: 0
     property real radius: 22
     property color accent: Kirigami.Theme.highlightColor
@@ -157,44 +156,25 @@ Item {
     }
 
     // ------------------------------------------------------------- background
-    Item {
-        id: background
+    Widgets.GlassSurface {
         z: -1
-        // in theme mode, also cover the frame padding so the tint is even
         anchors.fill: parent
-        anchors.leftMargin: view.customBackground ? 0 : -(view.frameMargins?.left ?? 0) + 1
-        anchors.rightMargin: view.customBackground ? 0 : -(view.frameMargins?.right ?? 0) + 1
-        anchors.topMargin: view.customBackground ? 0 : -(view.frameMargins?.top ?? 0) + 1
-        anchors.bottomMargin: view.customBackground ? 0 : -(view.frameMargins?.bottom ?? 0) + 1
-
-        // Blur: tint on top of Plasma's blurred frame
-        Rectangle {
-            visible: !view.customBackground
-            anchors.fill: parent
-            radius: Kirigami.Units.cornerRadius
-            color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g,
-                           Kirigami.Theme.backgroundColor.b, view.backgroundOpacity)
-        }
-
-        // other styles: the dock's glass
-        Widgets.GlassSurface {
-            visible: view.customBackground
-            anchors.fill: parent
-            style: view.style
-            backgroundOpacity: view.backgroundOpacity
-            radius: view.radius
-            isDark: view.isDark
-            accent: view.accent
-            accentTint: view.accentTint
-            showBorder: view.showBorder
-            showShadow: false        // the window has no room for it
-            forceBody: true
-        }
+        style: view.style
+        backgroundOpacity: view.backgroundOpacity
+        radius: view.radius
+        isDark: view.isDark
+        accent: view.accent
+        accentTint: view.accentTint
+        showBorder: view.showBorder
+        showShadow: false        // the window has no room for it
+        forceBody: true
+        blurBehind: view.blurBehind
+        frost: view.frost
     }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: view.customBackground ? Kirigami.Units.largeSpacing * 1.5 : 0
+        anchors.margins: Kirigami.Units.largeSpacing * 1.5
         spacing: Kirigami.Units.largeSpacing
 
         // ------------------------------------------------------------ search
