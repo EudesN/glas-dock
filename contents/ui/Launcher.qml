@@ -27,27 +27,40 @@ Item {
     signal closeFinished()
 
     // ---------------------------------------------------------------- animation
-    // Open: fade in, grow from 94% and rise 18 px out of the dock.
+    // Open: fade in and grow out of the dock, then the content below the search
+    // field follows a moment later (staggered). When KWin already slides the
+    // window (theme background), the content only fades/grows a little, so the
+    // two motions do not add up.
     // Close: quick fade/shrink, then closeFinished() hides the window.
     property bool animated: true
     property int animationDuration: 220
+    property bool windowSlides: false
+    // follows Plasma's global animation speed (0 when animations are off)
+    readonly property int dur: Math.round(animationDuration * Kirigami.Units.longDuration / 200)
+    readonly property bool closing: closeAnim.running
+    property real reveal: 1   // 0..1, content below the search field
 
     transformOrigin: Item.Bottom
     transform: Translate { id: rise; y: 0 }
 
     function playOpen() {
         closeAnim.stop();
-        if (!animated) {
-            opacity = 1; scale = 1; rise.y = 0;
+        if (!animated || dur < 10) {
+            opacity = 1; scale = 1; rise.y = 0; reveal = 1;
             return;
         }
-        opacity = 0; scale = 0.94; rise.y = 18;
+        opacity = 0;
+        scale = windowSlides ? 0.98 : 0.94;
+        rise.y = windowSlides ? 0 : 16;
+        reveal = 0;
         openAnim.restart();
     }
 
     function playClose() {
+        if (closeAnim.running)
+            return;
         openAnim.stop();
-        if (!animated || opacity === 0) {
+        if (!animated || dur < 10 || opacity === 0) {
             closeFinished();
             return;
         }
@@ -56,17 +69,21 @@ Item {
 
     ParallelAnimation {
         id: openAnim
-        NumberAnimation { target: view; property: "opacity"; to: 1; duration: view.animationDuration; easing.type: Easing.OutCubic }
-        NumberAnimation { target: view; property: "scale"; to: 1; duration: view.animationDuration; easing.type: Easing.OutBack; easing.overshoot: 1.2 }
-        NumberAnimation { target: rise; property: "y"; to: 0; duration: view.animationDuration; easing.type: Easing.OutCubic }
+        NumberAnimation { target: view; property: "opacity"; to: 1; duration: view.dur * 0.8; easing.type: Easing.OutCubic }
+        NumberAnimation { target: view; property: "scale"; to: 1; duration: view.dur; easing.type: Easing.OutBack; easing.overshoot: 1.05 }
+        NumberAnimation { target: rise; property: "y"; to: 0; duration: view.dur; easing.type: Easing.OutQuint }
+        SequentialAnimation {
+            PauseAnimation { duration: view.dur * 0.3 }
+            NumberAnimation { target: view; property: "reveal"; to: 1; duration: view.dur; easing.type: Easing.OutCubic }
+        }
     }
 
     SequentialAnimation {
         id: closeAnim
         ParallelAnimation {
-            NumberAnimation { target: view; property: "opacity"; to: 0; duration: view.animationDuration * 0.6; easing.type: Easing.InCubic }
-            NumberAnimation { target: view; property: "scale"; to: 0.96; duration: view.animationDuration * 0.6; easing.type: Easing.InCubic }
-            NumberAnimation { target: rise; property: "y"; to: 10; duration: view.animationDuration * 0.6; easing.type: Easing.InCubic }
+            NumberAnimation { target: view; property: "opacity"; to: 0; duration: view.dur * 0.55; easing.type: Easing.InCubic }
+            NumberAnimation { target: view; property: "scale"; to: 0.97; duration: view.dur * 0.55; easing.type: Easing.InCubic }
+            NumberAnimation { target: rise; property: "y"; to: view.windowSlides ? 0 : 8; duration: view.dur * 0.55; easing.type: Easing.InCubic }
         }
         ScriptAction { script: view.closeFinished() }
     }
@@ -200,6 +217,9 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: Kirigami.Units.largeSpacing
+            // staggered reveal
+            opacity: view.reveal
+            transform: Translate { y: (1 - view.reveal) * 10 }
 
             // ---------------------------------------------------- categories
             QQC2.ScrollView {
@@ -375,6 +395,7 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
+            opacity: view.reveal
 
             Item { Layout.fillWidth: true }
 
