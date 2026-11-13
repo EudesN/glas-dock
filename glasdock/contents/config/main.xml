@@ -20,6 +20,8 @@
     <entry name="iconSpacing" type="Int"><default>7</default></entry>
     <entry name="centeredZoom" type="Bool"><default>true</default></entry>
     <entry name="allowReorder" type="Bool"><default>true</default></entry>
+    <entry name="showPreviews" type="Bool"><default>true</default></entry>
+    <entry name="previewWidth" type="Int"><default>220</default></entry>
     <entry name="useAccentColor" type="Bool"><default>true</default></entry>
     <entry name="glassAccentTint" type="Double"><default>0.0</default></entry>
     <entry name="dockStyle" type="Int"><default>0</default></entry>

@@ -9,6 +9,8 @@ KCM.SimpleKCM {
     property alias cfg_iconSpacing: iconSpacing.value
     property alias cfg_centeredZoom: centeredZoom.checked
     property alias cfg_allowReorder: allowReorder.checked
+    property alias cfg_showPreviews: showPreviews.checked
+    property alias cfg_previewWidth: previewWidth.value
     property alias cfg_useAccentColor: useAccentColor.checked
     property alias cfg_glassAccentTint: glassAccentTint.value
     property alias cfg_dockStyle: dockStyle.currentIndex
@@ -151,6 +153,20 @@ KCM.SimpleKCM {
             id: allowReorder
             Kirigami.FormData.label: "Behavior:"
             text: "Drag icons to reorder them"
+        }
+
+        QQC2.CheckBox {
+            id: showPreviews
+            text: "Show window previews on hover"
+        }
+
+        QQC2.SpinBox {
+            id: previewWidth
+            Kirigami.FormData.label: "Preview size:"
+            enabled: showPreviews.checked
+            from: 140; to: 480; stepSize: 20
+            textFromValue: v => v + " px"
+            valueFromText: t => parseInt(t)
         }
 
         QQC2.CheckBox {

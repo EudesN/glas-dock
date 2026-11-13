@@ -244,6 +244,110 @@ PlasmoidItem {
             : (isDark ? "white" : Qt.rgba(0, 0, 0, 0.75))
 
         // --- drag to reorder
+        // --- window previews on hover
+        property Item previewTask: null   // task whose previews are shown / pending
+        readonly property bool previewOpen: windowPreview.visible
+
+        // windows of a task: one entry per window (children of a group)
+        function windowsOf(task) {
+            const list = [];
+            const add = (idx, row, child) => {
+                const ids = tasksModel.data(idx, TaskManager.AbstractTasksModel.WinIdList) || [];
+                if (ids.length === 0)
+                    return;
+                list.push({
+                    uuid: String(ids[0]),
+                    title: tasksModel.data(idx, Qt.DisplayRole) || "",
+                    icon: tasksModel.data(idx, Qt.DecorationRole),
+                    row: row, child: child
+                });
+            };
+            if (task.model.IsGroupParent) {
+                for (let c = 0; c < task.model.ChildCount; c++)
+                    add(tasksModel.makeModelIndex(task.index, c), task.index, c);
+            } else {
+                add(tasksModel.makeModelIndex(task.index), task.index, -1);
+            }
+            return list;
+        }
+
+        function showPreviewFor(task) {
+            const wins = windowsOf(task);
+            if (wins.length === 0) {
+                hidePreview();
+                return;
+            }
+            previewTask = task;
+            windowPreview.windows = wins;
+            const p = task.mapToGlobal(task.width / 2, 0);
+            windowPreview.anchorX = p.x;
+            windowPreview.anchorTop = dock.mapToGlobal(0, glass.y).y;
+            windowPreview.visible = true;
+            windowPreview.reposition();
+        }
+        function hidePreview() {
+            previewShowTimer.stop();
+            previewHideTimer.stop();
+            windowPreview.visible = false;
+            previewTask = null;
+        }
+        // called by the task icons
+        function previewEnter(task) {
+            if (!cfg.showPreviews || dragging || contextMenuOpen || task.isLauncher)
+                return;
+            previewHideTimer.stop();
+            previewTask = task;
+            if (windowPreview.visible)
+                showPreviewFor(task);       // already open: switch right away
+            else
+                previewShowTimer.restart();
+        }
+        function previewLeave() {
+            previewShowTimer.stop();
+            if (windowPreview.visible)
+                previewHideTimer.restart();
+        }
+
+        Timer {
+            id: previewShowTimer
+            interval: 450
+            onTriggered: if (dock.previewTask) dock.showPreviewFor(dock.previewTask)
+        }
+        Timer {
+            id: previewHideTimer
+            interval: 280
+            onTriggered: {
+                if (windowPreview.hovered)
+                    return;
+                dock.hidePreview();
+            }
+        }
+
+        WindowPreview {
+            id: windowPreview
+            screenGeometry: Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0)
+            thumbWidth: dock.cfg.previewWidth
+            style: dock.cfg.dockStyle
+            backgroundOpacity: dock.cfg.glassOpacity
+            radius: dock.cfg.cornerRadius
+            isDark: dock.isDark
+            accent: dock.accent
+            accentTint: dock.cfg.glassAccentTint
+            showBorder: dock.cfg.showBorder
+            showShadow: dock.cfg.showShadow
+            onHoveredChanged: hovered ? previewHideTimer.stop() : dock.previewLeave()
+            onActivateRequested: (row, child) => {
+                tasksModel.requestActivate(tasksModel.makeModelIndex(row, child));
+                dock.hidePreview();
+            }
+            onCloseRequested: (row, child) => {
+                tasksModel.requestClose(tasksModel.makeModelIndex(row, child));
+                // refresh (or hide when it was the last window)
+                const t = dock.previewTask;
+                Qt.callLater(() => { if (t && windowPreview.visible) dock.showPreviewFor(t); });
+            }
+        }
+
         property Item dragItem: null    // delegate being dragged (identity survives moves)
         property Item droppedItem: null // just released: animates into its slot
         property real dragX: 0          // pointer x (dock coordinates)
@@ -932,6 +1036,7 @@ PlasmoidItem {
                 Rectangle {
                     id: label
                     readonly property bool shown: dock.cfg.showLabels && mouse.containsMouse
+                                                  && !(dock.previewOpen && dock.previewTask === task)
                                                   && !dock.contextMenuOpen && !dock.dragging
                     opacity: shown ? 1 : 0
                     visible: opacity > 0
@@ -973,6 +1078,8 @@ PlasmoidItem {
                     acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
                     preventStealing: true
 
+                    onContainsMouseChanged: containsMouse ? dock.previewEnter(task) : dock.previewLeave()
+
                     property point pressPos
                     property bool dragActive: false
                     property bool suppressClick: false
@@ -988,6 +1095,7 @@ PlasmoidItem {
                         if (!dragActive && Math.abs(m.x - pressPos.x) > Qt.styleHints.startDragDistance) {
                             dragActive = true;
                             dock.dragItem = task;
+                            dock.hidePreview();
                         }
                         if (dragActive) {
                             const p = mapToItem(dock, m.x, m.y);
@@ -1015,6 +1123,7 @@ PlasmoidItem {
                             suppressClick = false;
                             return;
                         }
+                        dock.hidePreview();
                         if (mouseEvent.button === Qt.LeftButton) {
                             task.activate();
                         } else if (mouseEvent.button === Qt.MiddleButton) {
