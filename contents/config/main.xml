@@ -19,6 +19,9 @@
     <entry name="appsButtonZoom" type="Bool"><default>false</default></entry>
     <entry name="iconSpacing" type="Int"><default>7</default></entry>
     <entry name="centeredZoom" type="Bool"><default>true</default></entry>
+    <entry name="allowReorder" type="Bool"><default>true</default></entry>
+    <entry name="useAccentColor" type="Bool"><default>true</default></entry>
+    <entry name="glassAccentTint" type="Double"><default>0.0</default></entry>
     <entry name="launcherAnimation" type="Bool"><default>true</default></entry>
     <entry name="launcherAnimationDuration" type="Int"><default>220</default></entry>
     <entry name="appsButtonIcon" type="String"><default>start-here</default></entry>

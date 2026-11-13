@@ -8,6 +8,9 @@ KCM.SimpleKCM {
     property alias cfg_iconSize: iconSize.value
     property alias cfg_iconSpacing: iconSpacing.value
     property alias cfg_centeredZoom: centeredZoom.checked
+    property alias cfg_allowReorder: allowReorder.checked
+    property alias cfg_useAccentColor: useAccentColor.checked
+    property alias cfg_glassAccentTint: glassAccentTint.value
     property alias cfg_launcherAnimation: launcherAnimation.checked
     property alias cfg_launcherAnimationDuration: launcherAnimationDuration.value
     property alias cfg_maxZoom: maxZoom.value
@@ -69,6 +72,18 @@ KCM.SimpleKCM {
             QQC2.Label { text: Math.round(glassOpacity.value * 100) + "%" }
         }
 
+        QQC2.CheckBox {
+            id: useAccentColor
+            Kirigami.FormData.label: "Accent color:"
+            text: "Use the system accent color for the dock details"
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: "Accent tint on glass:"
+            QQC2.Slider { id: glassAccentTint; from: 0.0; to: 0.5; stepSize: 0.01 }
+            QQC2.Label { text: Math.round(glassAccentTint.value * 100) + "%" }
+        }
+
         QQC2.SpinBox {
             id: cornerRadius
             Kirigami.FormData.label: "Corner radius:"
@@ -92,8 +107,13 @@ KCM.SimpleKCM {
         }
 
         QQC2.CheckBox {
-            id: showLabels
+            id: allowReorder
             Kirigami.FormData.label: "Behavior:"
+            text: "Drag icons to reorder them"
+        }
+
+        QQC2.CheckBox {
+            id: showLabels
             text: "Show app name on hover"
         }
 

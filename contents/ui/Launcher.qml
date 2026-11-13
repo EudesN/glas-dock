@@ -242,6 +242,8 @@ Item {
                 id: grid
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                // a little room after the category separator
+                Layout.leftMargin: view.searching ? 0 : Kirigami.Units.smallSpacing
                 clip: true
                 model: view.gridModel
                 keyNavigationWraps: true
@@ -250,7 +252,8 @@ Item {
                 cellHeight: view.iconSize + Kirigami.Units.gridUnit * 3
                 highlightMoveDuration: 0
                 highlight: PlasmaExtras.Highlight {}
-                QQC2.ScrollBar.vertical: PC3.ScrollBar {}
+                // the scrollbar sits beside the grid (not over the last column)
+                QQC2.ScrollBar.vertical: gridScroll
 
                 Keys.onReturnPressed: view.launch(currentIndex)
                 Keys.onEnterPressed: view.launch(currentIndex)
@@ -276,7 +279,10 @@ Item {
 
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: Kirigami.Units.smallSpacing
+                        anchors.topMargin: Kirigami.Units.smallSpacing
+                        anchors.bottomMargin: Kirigami.Units.smallSpacing
+                        anchors.leftMargin: Kirigami.Units.smallSpacing
+                        anchors.rightMargin: Kirigami.Units.smallSpacing
                         spacing: Kirigami.Units.smallSpacing
 
                         Kirigami.Icon {
@@ -287,6 +293,7 @@ Item {
                             active: cellMouse.containsMouse
                         }
                         PC3.Label {
+                            id: cellLabel
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             text: cell.model.display ?? ""
@@ -296,6 +303,13 @@ Item {
                             maximumLineCount: 2
                             elide: Text.ElideRight
                         }
+                    }
+
+                    // full name when it does not fit in two lines
+                    PC3.ToolTip {
+                        text: cellLabel.text
+                        visible: cellMouse.containsMouse && cellLabel.truncated
+                        delay: Kirigami.Units.toolTipDelay
                     }
 
                     MouseArea {
@@ -347,6 +361,13 @@ Item {
                     explanation: view.searching ? ""
                         : "Right-click an app and choose “Add to Favorites”."
                 }
+            }
+
+            PC3.ScrollBar {
+                id: gridScroll
+                Layout.fillHeight: true
+                // keep the space reserved so the grid does not reflow when it appears
+                opacity: grid.contentHeight > grid.height ? 1 : 0
             }
         }
 
