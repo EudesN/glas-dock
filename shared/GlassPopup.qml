@@ -16,6 +16,9 @@ PlasmaCore.Dialog {
     property Item anchorItem: null
     property int edge: PlasmaCore.Types.TopEdge   // screen edge of the panel
     property int gap: 8
+    // global geometry of the screen the panel is on (Plasmoid.containment.screenGeometry);
+    // used to keep the panel fully on screen when the widget sits near an edge
+    property rect screenGeometry: Qt.rect(0, 0, 0, 0)
     property alias sourceComponent: loader.sourceComponent
     readonly property Item contentItem: loader.item
 
@@ -80,9 +83,11 @@ PlasmaCore.Dialog {
         const p = anchorItem.mapToGlobal(0, 0);
         const w = frame.width, h = frame.height, m = frame.shadowMargin;
         let nx = Math.round(p.x + anchorItem.width / 2 - w / 2);
-        const scr = anchorItem.Window.window ? anchorItem.Window.window.screen : null;
-        if (scr) {
-            const left = scr.virtualX + 4 - m, right = scr.virtualX + scr.width - 4 + m;
+        const g = screenGeometry;
+        if (g.width > 0) {
+            // the frame has a transparent shadow margin m on each side
+            const margin = Kirigami.Units.smallSpacing * 2;
+            const left = g.x + margin - m, right = g.x + g.width - margin + m;
             nx = Math.max(left, Math.min(right - w, nx));
         }
         x = nx;

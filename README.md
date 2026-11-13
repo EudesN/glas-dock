@@ -59,7 +59,12 @@ glasdock/      the dock
 glasplayer/    panel media player
 glasweather/   panel weather
 install.sh     syncs shared/ into each widget and installs/updates it
+tools/         development helpers
 ```
+
+To check the player widgets without a real player, run the silent fake MPRIS
+player: `python3 tools/fake_player.py [cover.png]` (play/pause, previous/next
+and seeking work).
 
 ## Known limitations
 

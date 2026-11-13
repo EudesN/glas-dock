@@ -96,12 +96,7 @@ PlasmoidItem {
             anchors.rightMargin: compact.pad * (root.cfg.pillBackground ? 2 : 1)
             spacing: Math.round(compact.height * 0.22)
 
-            Shared.Cover {
-                Layout.preferredWidth: compact.height - compact.pad * 2
-                Layout.preferredHeight: compact.height - compact.pad * 2
-                player: root.player
-            }
-
+            // (the cover is only shown in the glass panel)
             Shared.MarqueeText {
                 opacity: root.hasPlayer ? 1 : 0.6
                 Layout.fillWidth: true
@@ -113,28 +108,51 @@ PlasmoidItem {
                       + (root.cfg.showArtist && root.player.artist ? "  ·  " + root.player.artist : "")
             }
 
-            Repeater {
-                model: root.cfg.showSkipButtons && root.hasPlayer
-                       ? ["media-skip-backward", "PLAY", "media-skip-forward"] : (root.hasPlayer ? ["PLAY"] : [])
-                delegate: Item {
-                    required property string modelData
-                    readonly property bool isPlay: modelData === "PLAY"
-                    Layout.preferredWidth: compact.height * 0.62
-                    Layout.preferredHeight: compact.height * 0.62
-                    Kirigami.Icon {
-                        anchors.fill: parent
-                        source: parent.isPlay ? (root.playing ? "media-playback-pause" : "media-playback-start")
-                                              : parent.modelData
-                        opacity: btn.containsMouse ? 1 : 0.8
-                    }
-                    MouseArea {
-                        id: btn
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onClicked: {
-                            if (parent.isPlay) root.player.PlayPause();
-                            else if (parent.modelData === "media-skip-backward") root.player.Previous();
-                            else root.player.Next();
+            // controls: previous / play-pause / next
+            Row {
+                visible: root.hasPlayer
+                spacing: 0
+                Layout.alignment: Qt.AlignVCenter
+
+                Repeater {
+                    model: root.cfg.showSkipButtons ? ["prev", "play", "next"] : ["play"]
+                    delegate: Item {
+                        id: ctl
+                        required property string modelData
+                        readonly property bool enabledNow: !root.hasPlayer ? false
+                            : modelData === "prev" ? root.player.canGoPrevious
+                            : modelData === "next" ? root.player.canGoNext
+                            : (root.player.canPlay || root.player.canPause)
+                        width: Math.round(compact.height * 0.9)
+                        height: width
+
+                        // round hover highlight
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: width / 2
+                            color: Kirigami.Theme.textColor
+                            opacity: ctlArea.pressed ? 0.18 : ctlArea.containsMouse && ctl.enabledNow ? 0.10 : 0
+                            Behavior on opacity { NumberAnimation { duration: 100 } }
+                        }
+                        Kirigami.Icon {
+                            anchors.centerIn: parent
+                            width: Math.round(compact.height * (ctl.modelData === "play" ? 0.66 : 0.56))
+                            height: width
+                            source: ctl.modelData === "prev" ? "media-skip-backward"
+                                  : ctl.modelData === "next" ? "media-skip-forward"
+                                  : root.playing ? "media-playback-pause" : "media-playback-start"
+                            opacity: ctl.enabledNow ? (ctlArea.containsMouse ? 1 : 0.85) : 0.3
+                        }
+                        MouseArea {
+                            id: ctlArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: ctl.enabledNow
+                            onClicked: {
+                                if (ctl.modelData === "prev") root.player.Previous();
+                                else if (ctl.modelData === "next") root.player.Next();
+                                else root.player.PlayPause();
+                            }
                         }
                     }
                 }
@@ -145,6 +163,7 @@ PlasmoidItem {
             id: popup
             anchorItem: compact
             edge: Plasmoid.location
+            screenGeometry: Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0)
             style: root.cfg.popupStyle
             backgroundOpacity: root.cfg.popupOpacity
             radius: root.cfg.popupRadius
