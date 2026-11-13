@@ -265,7 +265,10 @@ PlasmoidItem {
 
         // Fixed width (with room for the zoom) so the panel does not resize on
         // every mouse move.
-        Layout.minimumWidth: restWidth + pad * 2 + zoomSlack + 8
+        // + room for one more icon: a newly opened app fits even before Plasma
+        // has resized the panel (it was cut at the edge for a moment)
+        readonly property real spareRoom: baseIcon + spacing
+        Layout.minimumWidth: restWidth + pad * 2 + zoomSlack + 8 + spareRoom
         Layout.preferredWidth: Layout.minimumWidth
         Layout.maximumWidth: Layout.minimumWidth
         Layout.fillHeight: true
@@ -567,8 +570,31 @@ PlasmoidItem {
                 }
             }
             const iconsEnd = x0 + iconsTotal;
+            // real extent of the icons (the bar is drawn around it)
+            const first = n > 0 ? xs[0] : x0;
+            const last = n > 0 ? xs[n - 1] + sizes[n - 1] : x0;
             return { sizes: sizes, xs: xs, total: total, x0: x0, separators: seps,
+                     firstX: Math.min(x0, first), lastX: Math.max(x0 + total, last + widgetsWidth),
                      iconsEnd: iconsEnd, widgetsX: iconsEnd + sepGap };
+        }
+
+        // Watchdog: if an icon ever ends up outside the bar or the widget, log the
+        // numbers (journalctl --user | grep Glasdock) so the cause can be found.
+        Timer {
+            interval: 1000
+            repeat: true
+            running: dock.visible && taskRepeater.count > 0
+            onTriggered: {
+                const li = taskRepeater.itemAt(taskRepeater.count - 1);
+                if (!li || !li.visible || dock.dragging)
+                    return;
+                const right = li.x + li.width;
+                if (right > glass.x + glass.width + 1 || right > dock.width + 1)
+                    console.warn("Glasdock: icon outside the bar: icon " + li.x.toFixed(0) + ".." + right.toFixed(0)
+                        + " bar " + glass.x + ".." + (glass.x + glass.width) + " widget " + dock.width.toFixed(0)
+                        + " needed " + dock.Layout.minimumWidth.toFixed(0) + " slots " + dock.slots
+                        + " sizes " + dock.layout.sizes.length);
+            }
         }
 
         // ------------------------------------------------------- glass bar
@@ -576,8 +602,9 @@ PlasmoidItem {
             id: glass
             // both edges rounded from the same positions (rounding x and width
             // separately made the right edge flicker by a pixel)
-            readonly property real leftEdge: Math.round(dock.layout.x0 - dock.pad)
-            readonly property real rightEdge: Math.round(dock.layout.x0 + Math.max(dock.layout.total, dock.baseIcon) + dock.pad)
+            // always around every icon, from the icons' actual positions
+            readonly property real leftEdge: Math.round(dock.layout.firstX - dock.pad)
+            readonly property real rightEdge: Math.round(Math.max(dock.layout.lastX, dock.layout.firstX + dock.baseIcon) + dock.pad)
             x: leftEdge
             y: dock.barY
             width: rightEdge - leftEdge
