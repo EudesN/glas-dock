@@ -416,23 +416,61 @@ PlasmoidItem {
         readonly property var layout: {
             const n = slots, b = baseIcon, sp = spacing;
             const R = b * cfg.zoomRange;
-            const z = (maxZoom - 1) * zoom;
+            const z = (maxZoom - 1) * zoom;          // 0..maxZoom-1, animated
             const left0 = (width - restWidth) / 2;
-            let sizes = [], total = 0, leftExtra = 0;
+            const center = i => left0 + i * (b + sp) + b / 2;
+            const g = d => d < R ? (Math.cos(Math.PI * d / R) + 1) / 2 : 0;
+            const zoomable = i => !(i === 0 && offset === 1 && !cfg.appsButtonZoom);
+
+            // extra width of each icon for the current pointer position
+            let extras = [], sumE = 0;
             for (let i = 0; i < n; i++) {
-                const restX = left0 + i * (b + sp);
-                const d = Math.abs(mouseX - (restX + b / 2));
-                const g = d < R ? (Math.cos(Math.PI * d / R) + 1) / 2 : 0;
-                const fixed = i === 0 && offset === 1 && !cfg.appsButtonZoom;
-                const s = fixed ? b : b * (1 + z * g);
-                const t = Math.max(0, Math.min(1, (mouseX - restX) / b));
-                leftExtra += (s - b) * t;
-                sizes.push(s);
-                total += s;
+                const e = zoomable(i) ? b * z * g(Math.abs(mouseX - center(i))) : 0;
+                extras.push(e);
+                sumE += e;
             }
-            total += sp * Math.max(0, n - 1);
-            const iconsTotal = total;
-            total += widgetsWidth;
+
+            // Centered zoom: keep the total extra (= the bar width) the same as
+            // with the pointer in the middle of the icons, so the bar edges don't
+            // "breathe" while the pointer moves along it. Near the ends, where
+            // fewer neighbours are magnified, the magnified ones grow a bit more
+            // to make up the difference ("water-filling"), never beyond the
+            // maximum zoom. (Simulated: width varies < 0.1 px end to end.)
+            if (cfg.centeredZoom && sumE > 0 && n > 1) {
+                const first = zoomable(0) ? 0 : 1;
+                const mid = (center(first) + center(n - 1)) / 2;
+                let target = 0;
+                for (let i = 0; i < n; i++)
+                    if (zoomable(i))
+                        target += b * z * g(Math.abs(mid - center(i)));
+                const cap = b * z;
+                for (let pass = 0; pass < 6; pass++) {
+                    let capped = 0, free = 0;
+                    for (let i = 0; i < n; i++) {
+                        if (extras[i] >= cap - 0.001) capped += extras[i];
+                        else free += extras[i];
+                    }
+                    if (free <= 0 || Math.abs(target - capped - free) < 0.05)
+                        break;
+                    const k = (target - capped) / free;
+                    for (let i = 0; i < n; i++)
+                        if (extras[i] < cap - 0.001)
+                            extras[i] = Math.min(cap, extras[i] * k);
+                }
+                sumE = 0;
+                for (let i = 0; i < n; i++)
+                    sumE += extras[i];
+            }
+
+            let sizes = [], leftExtra = 0;
+            for (let i = 0; i < n; i++) {
+                const s = b + extras[i];
+                const restX = center(i) - b / 2;
+                leftExtra += extras[i] * Math.max(0, Math.min(1, (mouseX - restX) / b));
+                sizes.push(s);
+            }
+            const iconsTotal = n * b + sumE + sp * Math.max(0, n - 1);
+            const total = iconsTotal + widgetsWidth;
             const x0 = cfg.centeredZoom ? (width - total) / 2 : left0 - leftExtra;
             let xs = [], x = x0;
             for (let i = 0; i < n; i++) {
@@ -447,9 +485,13 @@ PlasmoidItem {
         // ------------------------------------------------------- glass bar
         Item {
             id: glass
-            x: dock.blurStyle ? 0 : Math.round(dock.layout.x0 - dock.pad)
+            // both edges rounded from the same positions (rounding x and width
+            // separately made the right edge flicker by a pixel)
+            readonly property real leftEdge: Math.round(dock.layout.x0 - dock.pad)
+            readonly property real rightEdge: Math.round(dock.layout.x0 + Math.max(dock.layout.total, dock.baseIcon) + dock.pad)
+            x: dock.blurStyle ? 0 : leftEdge
             y: dock.barY
-            width: dock.blurStyle ? dock.width : Math.round(Math.max(dock.layout.total, dock.baseIcon) + dock.pad * 2)
+            width: dock.blurStyle ? dock.width : rightEdge - leftEdge
             height: dock.barHeight
 
             Widgets.GlassSurface {
