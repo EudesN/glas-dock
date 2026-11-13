@@ -11,6 +11,8 @@ import org.kde.kirigami as Kirigami
 import org.kde.taskmanager as TaskManager
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.notificationmanager as NotificationManager
+import org.kde.plasma.private.mpris as Mpris
+import "widgets" as Widgets
 
 PlasmoidItem {
     id: root
@@ -109,6 +111,24 @@ PlasmoidItem {
     }
     Component.onCompleted: recountTimer.start()
 
+    // ------------------------------------------------------ dock widgets data
+    Mpris.Mpris2Model { id: mpris2Model }
+
+    Widgets.WeatherData {
+        id: weatherData
+        city: Plasmoid.configuration.showWeather ? Plasmoid.configuration.weatherCity : ""
+        fahrenheit: Plasmoid.configuration.weatherFahrenheit
+    }
+
+    property date now: new Date()
+    Timer {
+        interval: 1000
+        repeat: true
+        running: Plasmoid.configuration.showClock
+        triggeredOnStart: true
+        onTriggered: root.now = new Date()
+    }
+
     // Runs shell commands (power actions)
     P5Support.DataSource {
         id: executable
@@ -151,7 +171,19 @@ PlasmoidItem {
 
         readonly property real barHeight: baseIcon + pad * 2
         readonly property real barY: height - cfg.bottomMargin - barHeight
-        readonly property real restWidth: slots * baseIcon + Math.max(0, slots - 1) * spacing
+        // --- widgets (player, weather, clock) after the app icons
+        readonly property real sepGap: Math.max(spacing, 6) * 2 + 1
+        readonly property var widgetWidths: {
+            const w = [];
+            if (cfg.showPlayer) w.push(Math.round(baseIcon * 3.8));
+            if (cfg.showWeather) w.push(Math.round(baseIcon * 2.4));
+            if (cfg.showClock) w.push(Math.round(baseIcon * 2.4));
+            return w;
+        }
+        readonly property real widgetsWidth: widgetWidths.length === 0 ? 0
+            : sepGap + widgetWidths.reduce((a, b) => a + b, 0) + spacing * (widgetWidths.length - 1)
+
+        readonly property real restWidth: slots * baseIcon + Math.max(0, slots - 1) * spacing + widgetsWidth
         readonly property real zoomSlack: (maxZoom - 1) * baseIcon * cfg.zoomRange * 1.15
 
         // Fixed width (with room for the zoom) so the panel does not resize on
@@ -210,7 +242,7 @@ PlasmoidItem {
         // button; returns the clamped pointer x
         function clampDragX(px, w) {
             const lo = (offset === 1 ? layout.xs[0] + layout.sizes[0] + spacing : layout.x0) + w / 2;
-            const hi = layout.x0 + layout.total - w / 2;
+            const hi = layout.iconsEnd - w / 2;
             return Math.max(lo, Math.min(hi, px));
         }
 
@@ -267,13 +299,17 @@ PlasmoidItem {
                 total += s;
             }
             total += sp * Math.max(0, n - 1);
+            const iconsTotal = total;
+            total += widgetsWidth;
             const x0 = cfg.centeredZoom ? (width - total) / 2 : left0 - leftExtra;
             let xs = [], x = x0;
             for (let i = 0; i < n; i++) {
                 xs.push(x);
                 x += sizes[i] + sp;
             }
-            return { sizes: sizes, xs: xs, total: total, x0: x0 };
+            const iconsEnd = x0 + iconsTotal;
+            return { sizes: sizes, xs: xs, total: total, x0: x0,
+                     iconsEnd: iconsEnd, widgetsX: iconsEnd + sepGap };
         }
 
         // ------------------------------------------------------- glass bar
@@ -515,6 +551,116 @@ PlasmoidItem {
             }
         }
 
+        // ------------------------------------------------------------ widgets
+        Rectangle {
+            // separator between apps and widgets
+            visible: dock.widgetsWidth > 0
+            x: Math.round(dock.layout.iconsEnd + dock.sepGap / 2)
+            y: dock.barY + dock.barHeight * 0.2
+            width: 1
+            height: dock.barHeight * 0.6
+            color: Qt.rgba(1, 1, 1, dock.isDark ? 0.18 : 0.5)
+        }
+
+        Row {
+            id: widgetsRow
+            visible: dock.widgetsWidth > 0
+            x: dock.layout.widgetsX
+            y: dock.barY + dock.pad
+            height: dock.baseIcon
+            spacing: dock.spacing
+
+            Widgets.PlayerTile {
+                id: playerTile
+                visible: dock.cfg.showPlayer
+                width: Math.round(dock.baseIcon * 3.8)
+                height: parent.height
+                isDark: dock.isDark
+                player: mpris2Model.currentPlayer
+                onClicked: dock.toggleWidgetPopup(playerTile, playerPopupComponent)
+            }
+            Widgets.WeatherTile {
+                id: weatherTile
+                visible: dock.cfg.showWeather
+                width: Math.round(dock.baseIcon * 2.4)
+                height: parent.height
+                isDark: dock.isDark
+                weather: weatherData
+                onClicked: dock.toggleWidgetPopup(weatherTile, weatherPopupComponent)
+            }
+            Widgets.ClockTile {
+                id: clockTile
+                visible: dock.cfg.showClock
+                width: Math.round(dock.baseIcon * 2.4)
+                height: parent.height
+                isDark: dock.isDark
+                now: root.now
+                onClicked: dock.toggleWidgetPopup(clockTile, clockPopupComponent)
+            }
+        }
+
+        Component { id: playerPopupComponent; Widgets.PlayerPopup { player: mpris2Model.currentPlayer } }
+        Component { id: weatherPopupComponent; Widgets.WeatherPopup { weather: weatherData } }
+        Component { id: clockPopupComponent; Widgets.ClockPopup { now: root.now } }
+
+        property double widgetPopupHiddenAt: 0
+        property Item widgetPopupAnchor: null
+        function toggleWidgetPopup(anchorItem, component) {
+            const same = widgetPopupAnchor === anchorItem;
+            if (widgetPopup.visible || (same && Date.now() - widgetPopupHiddenAt < 250)) {
+                widgetPopup.visible = false;
+                if (same)
+                    return;
+            }
+            launcher.visible = false;
+            widgetPopupAnchor = anchorItem;
+            widgetPopupLoader.sourceComponent = component;
+            widgetPopup.reposition();
+            widgetPopup.visible = true;
+            widgetPopup.reposition();
+            widgetPopup.requestActivate();
+        }
+
+        PlasmaCore.Dialog {
+            id: widgetPopup
+            type: PlasmaCore.Dialog.AppletPopup
+            flags: Qt.WindowStaysOnTopHint
+            location: dock.cfg.launcherAnimation ? PlasmaCore.Types.BottomEdge : PlasmaCore.Types.Floating
+            hideOnWindowDeactivate: true
+            backgroundHints: PlasmaCore.Dialog.StandardBackground
+            visible: false
+
+            onVisibleChanged: {
+                if (!visible)
+                    dock.widgetPopupHiddenAt = Date.now();
+                Plasmoid.status = visible || launcher.visible ? PlasmaCore.Types.RequiresAttentionStatus
+                                                              : PlasmaCore.Types.ActiveStatus;
+            }
+            onWidthChanged: if (visible) reposition()
+            onHeightChanged: if (visible) reposition()
+
+            // centered over its tile, launcherGap px above the bar
+            function reposition() {
+                if (!dock.widgetPopupAnchor)
+                    return;
+                const a = dock.widgetPopupAnchor;
+                const p = a.mapToGlobal(a.width / 2, 0);
+                const top = dock.mapToGlobal(0, glass.y).y;
+                const w = widgetPopupLoader.width + margins.left + margins.right;
+                const h = widgetPopupLoader.height + margins.top + margins.bottom;
+                x = Math.round(p.x - w / 2);
+                y = Math.round(top - dock.cfg.launcherGap - h);
+            }
+
+            mainItem: Loader {
+                id: widgetPopupLoader
+                width: item ? item.implicitWidth : 1
+                height: item ? item.implicitHeight : 1
+                focus: true
+                Keys.onEscapePressed: widgetPopup.visible = false
+            }
+        }
+
         // ------------------------------------------------------------- icons
         Repeater {
             id: taskRepeater
@@ -728,7 +874,8 @@ PlasmoidItem {
                     // over the running-indicator strip)
                     anchors.fill: parent
                     anchors.leftMargin: -(task.slot === 0 ? dock.pad : dock.spacing / 2)
-                    anchors.rightMargin: -(task.slot === dock.slots - 1 ? dock.pad : dock.spacing / 2)
+                    anchors.rightMargin: -(task.slot === dock.slots - 1 && dock.widgetsWidth === 0
+                                           ? dock.pad : dock.spacing / 2)
                     anchors.topMargin: Math.min(0, dock.barY - task.y)
                     anchors.bottomMargin: -(dock.barY + dock.barHeight - task.y - task.height)
                     hoverEnabled: true
