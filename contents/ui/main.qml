@@ -96,6 +96,10 @@ PlasmoidItem {
         interval: 150
         onTriggered: {
             const counts = {};
+            if (!Plasmoid.configuration.showBadges) {
+                root.notifCounts = counts;
+                return;
+            }
             for (let i = 0; i < notifModel.count; i++) {
                 const idx = notifModel.index(i, 0);
                 if (notifModel.data(idx, NotificationManager.Notifications.ReadRole))
@@ -108,6 +112,13 @@ PlasmoidItem {
         }
     }
     Component.onCompleted: recountTimer.start()
+    Connections {
+        target: Plasmoid.configuration
+        function onValueChanged(key, value) {
+            if (key === "showBadges")
+                recountTimer.restart();
+        }
+    }
 
     // Runs shell commands (power actions)
     P5Support.DataSource {
@@ -449,9 +460,13 @@ PlasmoidItem {
         Component.onCompleted: root.dockItem = dock
 
         property double launcherHiddenAt: 0
+        // The launcher (and its app/search models) is created on first use, not at
+        // Plasma startup.
+        readonly property Item launcherView: launcherLoader.item
+
         function toggleLauncher() {
-            // a click on the button first deactivates (hides) the popup;
-            // don't reopen it right away
+            if (!launcherLoader.active)
+                launcherLoader.active = true;
             // a click on the button first deactivates the popup (which starts
             // closing it); don't reopen it right away
             if (launcherView.closing || Date.now() - launcherHiddenAt < 250)
@@ -480,7 +495,7 @@ PlasmoidItem {
             location: kwinSlides ? PlasmaCore.Types.BottomEdge : PlasmaCore.Types.Floating
             // closing on deactivation is animated (onActiveChanged) instead
             hideOnWindowDeactivate: !dock.cfg.launcherAnimation
-            onActiveChanged: if (!active && visible) launcherView.playClose()
+            onActiveChanged: if (!active && visible && dock.launcherView) dock.launcherView.playClose()
             backgroundHints: dock.cfg.launcherCustomBackground ? PlasmaCore.Dialog.NoBackground
                                                                : PlasmaCore.Dialog.StandardBackground
             visible: false
@@ -497,16 +512,20 @@ PlasmoidItem {
             // centered over the glass bar, cfg.launcherGap px above it
             function reposition() {
                 const p = dock.mapToGlobal(glass.x + glass.width / 2, glass.y);
-                const w = launcherView.width + margins.left + margins.right;
-                const h = launcherView.height + margins.top + margins.bottom;
+                const w = launcherLoader.width + margins.left + margins.right;
+                const h = launcherLoader.height + margins.top + margins.bottom;
                 x = Math.round(p.x - w / 2);
                 y = Math.round(p.y - dock.cfg.launcherGap - h);
             }
 
-            mainItem: Launcher {
-                id: launcherView
+            mainItem: Loader {
+                id: launcherLoader
+                active: false
                 width: dock.cfg.launcherWidth
                 height: dock.cfg.launcherHeight
+                sourceComponent: Launcher {
+                width: launcherLoader.width
+                height: launcherLoader.height
                 appletInterface: root
                 iconSize: dock.cfg.launcherIconSize
                 customBackground: dock.cfg.launcherCustomBackground
@@ -520,6 +539,7 @@ PlasmoidItem {
                 onCloseFinished: launcher.visible = false
                 onRunCommand: cmd => executable.run(cmd)
                 onPinRequested: url => tasksModel.requestAddLauncher(url)
+                }
             }
         }
 
@@ -613,12 +633,18 @@ PlasmoidItem {
                     onTriggered: task.launching = false
                 }
 
-                // bounce (app launching or demanding attention)
+                // bounce (app launching or demanding attention). Both are capped:
+                // a launch bounces for at most ~2.4 s, an attention request three
+                // times, so a stuck flag never keeps the dock repainting forever.
+                readonly property bool startup: model.IsStartup === true
+                readonly property bool attention: model.IsDemandingAttention === true
+                property int attentionLeft: 0
+                onStartupChanged: if (startup) startLaunchBounce()
+                onAttentionChanged: attentionLeft = attention ? 3 : 0
                 SequentialAnimation {
                     loops: Animation.Infinite
                     alwaysRunToEnd: true
-                    running: task.launching || task.model.IsStartup === true
-                             || task.model.IsDemandingAttention === true
+                    running: task.launching || task.attentionLeft > 0
                     NumberAnimation {
                         target: task; property: "bounce"
                         to: dock.baseIcon * 0.5; duration: 280
@@ -628,6 +654,9 @@ PlasmoidItem {
                         target: task; property: "bounce"
                         to: 0; duration: 420
                         easing.type: Easing.OutBounce
+                    }
+                    ScriptAction {
+                        script: if (task.attentionLeft > 0) task.attentionLeft--
                     }
                 }
 
