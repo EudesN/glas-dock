@@ -494,6 +494,7 @@ PlasmoidItem {
                 height: parent.height
                 isDark: dock.isDark
                 player: mpris2Model.currentPlayer
+                active: dock.popupOpenFor(playerTile)
                 onClicked: dock.toggleWidgetPopup(playerTile, playerPopupComponent)
             }
             Widgets.WeatherTile {
@@ -503,6 +504,7 @@ PlasmoidItem {
                 height: parent.height
                 isDark: dock.isDark
                 weather: weatherData
+                active: dock.popupOpenFor(weatherTile)
                 onClicked: dock.toggleWidgetPopup(weatherTile, weatherPopupComponent)
             }
             Widgets.ClockTile {
@@ -512,6 +514,7 @@ PlasmoidItem {
                 height: parent.height
                 isDark: dock.isDark
                 now: root.now
+                active: dock.popupOpenFor(clockTile)
                 onClicked: dock.toggleWidgetPopup(clockTile, clockPopupComponent)
             }
         }
@@ -521,15 +524,32 @@ PlasmoidItem {
         Component { id: clockPopupComponent; Widgets.ClockPopup { now: root.now; accent: dock.accent; isDark: dock.isDark } }
 
         property double widgetPopupHiddenAt: 0
+        // the tile whose panel is open stays highlighted
+        function popupOpenFor(tile) {
+            return widgetPopup.visible && widgetPopupAnchor === tile && !popupFrame.closing;
+        }
         property Item widgetPopupAnchor: null
         function toggleWidgetPopup(anchorItem, component) {
             const same = widgetPopupAnchor === anchorItem;
-            if (widgetPopup.visible || (same && Date.now() - widgetPopupHiddenAt < 250)) {
-                widgetPopup.visible = false;
-                if (same)
+            // clicking the dock deactivates the panel first, which starts closing it
+            if (same && (popupFrame.closing || Date.now() - widgetPopupHiddenAt < 250))
+                return;
+            if (widgetPopup.visible) {
+                if (same) {
+                    popupFrame.playClose();
                     return;
+                }
+                // another tile: swap the content in place instead of closing/reopening
+                popupFrame.cancelClose();
+                widgetPopupAnchor = anchorItem;
+                widgetPopupLoader.sourceComponent = component;
+                widgetPopup.reposition();
+                popupFrame.playSwitch();
+                widgetPopup.requestActivate();
+                return;
             }
-            launcher.visible = false;
+            if (launcher.visible)
+                launcherView.playClose();
             widgetPopupAnchor = anchorItem;
             widgetPopupLoader.sourceComponent = component;
             widgetPopup.reposition();
@@ -543,7 +563,9 @@ PlasmoidItem {
             type: PlasmaCore.Dialog.AppletPopup
             flags: Qt.WindowStaysOnTopHint
             location: PlasmaCore.Types.Floating   // animated by popupFrame instead of KWin
-            hideOnWindowDeactivate: true
+            // closing on deactivation is animated (onActiveChanged) instead
+            hideOnWindowDeactivate: !dock.cfg.launcherAnimation
+            onActiveChanged: if (!active && visible) popupFrame.playClose()
             // drawn by GlassSurface so the panels match the dock
             backgroundHints: PlasmaCore.Dialog.NoBackground
             visible: false
@@ -578,20 +600,72 @@ PlasmoidItem {
                 width: widgetPopupLoader.width + (padding + shadowMargin) * 2
                 height: widgetPopupLoader.height + (padding + shadowMargin) * 2
 
-                // same open animation as the launcher
+                // Open: the glass grows out of its tile, the content follows a
+                // moment later. Switch: content cross-fades with a small pop.
+                // Close: quick fade/shrink, then the window is hidden.
+                // Durations follow Plasma's global animation speed.
+                readonly property int dur: Math.round(dock.cfg.launcherAnimationDuration * Kirigami.Units.longDuration / 200)
+                readonly property bool animated: dock.cfg.launcherAnimation && dur >= 10
+                readonly property bool closing: closeAnim.running
+                property real reveal: 1
+
                 function playOpen() {
-                    if (!dock.cfg.launcherAnimation) {
-                        panel.opacity = 1; panel.scale = 1; rise.y = 0;
+                    closeAnim.stop();
+                    if (!animated) {
+                        panel.opacity = 1; panel.scale = 1; rise.y = 0; reveal = 1;
                         return;
                     }
-                    panel.opacity = 0; panel.scale = 0.94; rise.y = 14;
+                    panel.opacity = 0; panel.scale = 0.92; rise.y = 14; reveal = 0;
                     openAnim.restart();
                 }
+                function playSwitch() {
+                    if (!animated)
+                        return;
+                    panel.opacity = 1; rise.y = 0;
+                    panel.scale = 0.97; reveal = 0;
+                    switchAnim.restart();
+                }
+                function playClose() {
+                    if (closeAnim.running)
+                        return;
+                    openAnim.stop();
+                    switchAnim.stop();
+                    if (!animated) {
+                        widgetPopup.visible = false;
+                        return;
+                    }
+                    closeAnim.restart();
+                }
+                function cancelClose() {
+                    if (!closeAnim.running)
+                        return;
+                    closeAnim.stop();
+                    panel.opacity = 1; panel.scale = 1; rise.y = 0; reveal = 1;
+                }
+
                 ParallelAnimation {
                     id: openAnim
-                    NumberAnimation { target: panel; property: "opacity"; to: 1; duration: dock.cfg.launcherAnimationDuration; easing.type: Easing.OutCubic }
-                    NumberAnimation { target: panel; property: "scale"; to: 1; duration: dock.cfg.launcherAnimationDuration; easing.type: Easing.OutBack; easing.overshoot: 1.2 }
-                    NumberAnimation { target: rise; property: "y"; to: 0; duration: dock.cfg.launcherAnimationDuration; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: panel; property: "opacity"; to: 1; duration: popupFrame.dur * 0.8; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: panel; property: "scale"; to: 1; duration: popupFrame.dur; easing.type: Easing.OutBack; easing.overshoot: 1.05 }
+                    NumberAnimation { target: rise; property: "y"; to: 0; duration: popupFrame.dur; easing.type: Easing.OutQuint }
+                    SequentialAnimation {
+                        PauseAnimation { duration: popupFrame.dur * 0.3 }
+                        NumberAnimation { target: popupFrame; property: "reveal"; to: 1; duration: popupFrame.dur; easing.type: Easing.OutCubic }
+                    }
+                }
+                ParallelAnimation {
+                    id: switchAnim
+                    NumberAnimation { target: panel; property: "scale"; to: 1; duration: popupFrame.dur; easing.type: Easing.OutBack; easing.overshoot: 1.05 }
+                    NumberAnimation { target: popupFrame; property: "reveal"; to: 1; duration: popupFrame.dur * 0.9; easing.type: Easing.OutCubic }
+                }
+                SequentialAnimation {
+                    id: closeAnim
+                    ParallelAnimation {
+                        NumberAnimation { target: panel; property: "opacity"; to: 0; duration: popupFrame.dur * 0.55; easing.type: Easing.InCubic }
+                        NumberAnimation { target: panel; property: "scale"; to: 0.95; duration: popupFrame.dur * 0.55; easing.type: Easing.InCubic }
+                        NumberAnimation { target: rise; property: "y"; to: 8; duration: popupFrame.dur * 0.55; easing.type: Easing.InCubic }
+                    }
+                    ScriptAction { script: widgetPopup.visible = false }
                 }
 
                 Item {
@@ -621,7 +695,10 @@ PlasmoidItem {
                         width: item ? item.implicitWidth : 1
                         height: item ? item.implicitHeight : 1
                         focus: true
-                        Keys.onEscapePressed: widgetPopup.visible = false
+                        Keys.onEscapePressed: popupFrame.playClose()
+                        // staggered reveal of the content
+                        opacity: popupFrame.reveal
+                        transform: Translate { y: (1 - popupFrame.reveal) * 8 }
                     }
                 }
             }
