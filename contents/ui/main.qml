@@ -637,16 +637,19 @@ PlasmoidItem {
                     Behavior on opacity { NumberAnimation { duration: 90 } }
                 }
 
-                // notification badge (top-right of the icon)
+                // notification badge (top-right of the icon):
+                // a plain dot for a single notification, the number when there are more
                 Rectangle {
                     id: badge
                     readonly property bool shown: dock.cfg.showBadges && task.badgeCount > 0 && !task.dragged
+                    readonly property bool numeric: task.badgeCount > 1
                     readonly property real h: Math.max(14, Math.round(task.size * 0.34))
-                    height: h
-                    width: Math.max(h, badgeText.implicitWidth + h * 0.55)
-                    radius: h / 2
-                    x: task.width - width * 0.8
-                    y: -h * 0.15
+                    readonly property real dotSize: Math.max(8, Math.round(h * 0.55))
+                    height: numeric ? h : dotSize
+                    width: numeric ? Math.max(h, badgeText.implicitWidth + h * 0.55) : dotSize
+                    radius: height / 2
+                    x: numeric ? task.width - width * 0.8 : task.width - width * 0.9
+                    y: numeric ? -h * 0.15 : -dotSize * 0.1
                     z: 5
                     // system accent color by default (red is the alternative)
                     color: dock.cfg.badgeUseAccent ? dock.accent : "#ff3b30"
@@ -658,6 +661,7 @@ PlasmoidItem {
 
                     Text {
                         id: badgeText
+                        visible: badge.numeric
                         anchors.centerIn: parent
                         text: task.badgeCount > 99 ? "99+" : task.badgeCount
                         // dark text on light accents, white otherwise
