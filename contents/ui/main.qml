@@ -648,6 +648,7 @@ PlasmoidItem {
                     x: task.width - width * 0.8
                     y: -h * 0.15
                     z: 5
+                    // system accent color by default (red is the alternative)
                     color: dock.cfg.badgeUseAccent ? dock.accent : "#ff3b30"
                     border.width: 1
                     border.color: Qt.rgba(0, 0, 0, 0.18)
@@ -659,7 +660,9 @@ PlasmoidItem {
                         id: badgeText
                         anchors.centerIn: parent
                         text: task.badgeCount > 99 ? "99+" : task.badgeCount
-                        color: "white"
+                        // dark text on light accents, white otherwise
+                        color: Kirigami.ColorUtils.brightnessForColor(badge.color) === Kirigami.ColorUtils.Light
+                               ? "#1d1d1f" : "white"
                         font.pixelSize: Math.round(badge.h * 0.62)
                         font.bold: true
                     }

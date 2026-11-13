@@ -138,7 +138,7 @@ KCM.SimpleKCM {
 
         QQC2.CheckBox {
             id: badgeUseAccent
-            text: "Use the accent color for badges (instead of red)"
+            text: "Use the system accent color for badges (otherwise red)"
             enabled: showBadges.checked
         }
 
