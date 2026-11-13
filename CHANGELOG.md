@@ -1,11 +1,34 @@
 # Changelog
 
-## Unreleased
+## 0.5.0-alpha.1
 
-- New panel widgets **Glasplayer** and **Glasweather** (for the top bar or any
-  panel), with the same glass panels as the dock.
-- Repository reorganized: one folder per widget plus `shared/`, installed with
-  `install.sh`.
+New widgets
+- **Glasplayer** and **Glasweather** for the top bar (or any panel): title,
+  artist and previous/play/next in the bar; icon, temperature and city; glass
+  panels with cover, progress, controls, current conditions and a 5-day
+  forecast. Panels stay on screen near screen edges.
+- Experimental player, weather and clock tiles inside the dock.
+
+Dock
+- Live window previews on hover (KWin screencast), with close and activate.
+- "Blur" style using Plasma's own blurred background, for the dock and all
+  panels; style choice for the launcher too (Glass, Frosted, Clear, Solid, Blur).
+- Bar width stays constant while the pointer moves along the icons (no wobble).
+- Settings split into Appearance, Behavior, Launcher and Widgets tabs.
+
+Animations and performance
+- Launcher and panels: single motion, staggered reveal, animated close,
+  follow Plasma's animation speed; panels swap content in place.
+- Launcher loaded on first use; capped launch/attention bounces; widgets cost
+  nothing when disabled; panel content destroyed when closed.
+
+Fixes
+- Player followed a paused player or got stuck on "Nothing playing".
+- Weather panel stuck on "Loading…", clipped titles, zero-width hidden player.
+
+Project
+- One folder per widget plus `shared/`; `install.sh` installs/updates them.
+- `tools/fake_player.py`: silent fake MPRIS player for testing.
 
 ## 0.4.0-alpha.1
 
