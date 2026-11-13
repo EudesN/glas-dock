@@ -22,6 +22,11 @@ PlasmoidItem {
     readonly property bool hasPlayer: player !== null && player !== undefined
     readonly property bool playing: hasPlayer && player.playbackStatus === Mpris.PlaybackStatus.Playing
     readonly property bool idle: !hasPlayer || player.playbackStatus === Mpris.PlaybackStatus.Stopped
+    // while the panel is being edited the widget is always shown, so it can be
+    // found, moved and configured even with "hide when idle" on
+    readonly property bool editing: Plasmoid.containment && Plasmoid.containment.corona
+                                    ? Plasmoid.containment.corona.editMode === true : false
+    readonly property bool hidden: idle && cfg.hideWhenIdle && !editing
 
     // on dark themes, dark accent colors are lifted a bit (same rule as the dock)
     readonly property bool isDark: Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.backgroundColor) === Kirigami.ColorUtils.Dark
@@ -31,14 +36,14 @@ PlasmoidItem {
 
     preferredRepresentation: fullRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
-    Plasmoid.status: idle && cfg.hideWhenIdle ? PlasmaCore.Types.PassiveStatus : PlasmaCore.Types.ActiveStatus
+    Plasmoid.status: hidden ? PlasmaCore.Types.PassiveStatus : PlasmaCore.Types.ActiveStatus
     toolTipMainText: hasPlayer ? (player.track || player.identity) : "Nothing playing"
     toolTipSubText: hasPlayer ? (player.artist || "") : ""
 
     fullRepresentation: Item {
         id: compact
 
-        readonly property bool collapsed: root.idle && root.cfg.hideWhenIdle
+        readonly property bool collapsed: root.hidden
         readonly property real pad: Math.round(height * 0.12)
 
         // (+ a few px so sub-pixel rounding doesn't elide text that fits)
@@ -98,6 +103,7 @@ PlasmoidItem {
             }
 
             Shared.MarqueeText {
+                opacity: root.hasPlayer ? 1 : 0.6
                 Layout.fillWidth: true
                 Layout.preferredWidth: implicitWidth
                 Layout.fillHeight: true
