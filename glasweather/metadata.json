@@ -1,0 +1,20 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "EudesN"
+            }
+        ],
+        "Category": "Environment and Weather",
+        "Description": "Weather for the panel with a glass forecast panel, from the Glasdock project",
+        "Icon": "weather-few-clouds",
+        "Id": "com.github.eudesn.glasweather",
+        "License": "GPL-2.0+",
+        "Name": "Glasweather",
+        "Version": "0.4.0-alpha.1",
+        "Website": "https://github.com/EudesN/glas-dock",
+        "BugReportUrl": "https://github.com/EudesN/glas-dock/issues"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

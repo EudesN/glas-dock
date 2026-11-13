@@ -11,7 +11,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.taskmanager as TaskManager
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.notificationmanager as NotificationManager
-import "widgets" as Widgets
+import "shared" as Widgets
 
 PlasmoidItem {
     id: root
@@ -340,7 +340,7 @@ PlasmoidItem {
             width: Math.round(Math.max(dock.layout.total, dock.baseIcon) + dock.pad * 2)
             height: dock.barHeight
 
-            GlassSurface {
+            Widgets.GlassSurface {
                 anchors.fill: parent
                 style: dock.cfg.dockStyle
                 backgroundOpacity: dock.cfg.glassOpacity
@@ -707,7 +707,7 @@ PlasmoidItem {
                     transformOrigin: Item.Bottom
                     transform: Translate { id: rise }
 
-                    GlassSurface {
+                    Widgets.GlassSurface {
                         anchors.fill: parent
                         style: dock.cfg.dockStyle
                         backgroundOpacity: dock.cfg.glassOpacity

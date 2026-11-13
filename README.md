@@ -1,6 +1,15 @@
 # Glasdock
 
-A macOS-style dock for KDE Plasma 6, written as a plain QML plasmoid.
+A macOS-style dock for KDE Plasma 6, plus matching panel widgets, written as
+plain QML plasmoids.
+
+| Widget | What it is |
+| --- | --- |
+| **Glasdock** (`glasdock/`) | The dock: icon zoom, glass bar, launcher, badges, optional player/weather/clock tiles |
+| **Glasplayer** (`glasplayer/`) | Media player for any panel (e.g. the top bar): cover, title, play/pause, glass panel with controls |
+| **Glasweather** (`glasweather/`) | Weather for any panel: icon and temperature, glass panel with a 5-day forecast |
+
+All of them share the same glass look and code (`shared/`).
 
 > **Status: alpha.** Features are still being added and things may change or
 > break between versions. Tested on Plasma 6.8 (Wayland).
@@ -28,18 +37,28 @@ A macOS-style dock for KDE Plasma 6, written as a plain QML plasmoid.
 
 ```bash
 git clone https://github.com/EudesN/glas-dock.git
-kpackagetool6 -t Plasma/Applet -i glas-dock
+cd glas-dock
+./install.sh --restart          # all widgets
+./install.sh glasplayer         # or only some of them
 ```
 
-Then add **Glasdock** to a bottom panel (right-click the panel → *Add Widgets…*).
-By default the widget makes its panel transparent and resizes it so the zoom has
-room to grow. Settings: right-click the dock → *Configure Glasdock…*
+Then add the widgets to a panel (right-click the panel → *Add Widgets…*):
+**Glasdock** to a bottom panel, **Glasplayer** / **Glasweather** anywhere (they
+open their glass panel below the widget on a top panel and above it on a
+bottom panel). Settings: right-click a widget → *Configure…*
 
-To update after pulling new changes:
+Each Plasma widget must contain all of its files, so `install.sh` copies
+`shared/` into every widget before installing it (`<widget>/contents/ui/shared/`,
+ignored by git). After pulling changes, run `./install.sh --restart` again.
 
-```bash
-kpackagetool6 -t Plasma/Applet -u glas-dock
-systemctl --user restart plasma-plasmashell
+## Project layout
+
+```
+shared/        code used by every widget (glass surface, panels, player/weather data)
+glasdock/      the dock
+glasplayer/    panel media player
+glasweather/   panel weather
+install.sh     syncs shared/ into each widget and installs/updates it
 ```
 
 ## Known limitations

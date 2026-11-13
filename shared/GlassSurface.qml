@@ -1,5 +1,5 @@
 /*
- * Glasdock — the dock's glass look, shared by the bar and the widget panels.
+ * Glasdock — the glass look shared by the dock, its panels and the panel widgets.
  * style: 0 = Glass, 1 = Frosted, 2 = Clear (no background), 3 = Solid
  */
 import QtQuick
@@ -60,7 +60,7 @@ Item {
         color: "transparent"
         opacity: surface.isDark ? 0.55 : 0.8
         source: Image {
-            source: Qt.resolvedUrl("../images/noise.png")
+            source: Qt.resolvedUrl("images/noise.png")
             fillMode: Image.Stretch
             smooth: false
             visible: false
