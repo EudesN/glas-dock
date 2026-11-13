@@ -15,7 +15,7 @@ PlasmaCore.Dialog {
 
     property Item anchorItem: null
     property int edge: PlasmaCore.Types.TopEdge   // screen edge of the panel
-    property int gap: 8
+    property int gap: 2
     // global geometry of the screen the panel is on (Plasmoid.containment.screenGeometry);
     // used to keep the panel fully on screen when the widget sits near an edge
     property rect screenGeometry: Qt.rect(0, 0, 0, 0)

@@ -17,6 +17,7 @@ KCM.SimpleKCM {
     property alias cfg_popupOpacity: popupOpacity.value
     property alias cfg_popupRadius: popupRadius.value
     property alias cfg_popupAnimation: popupAnimation.checked
+    property alias cfg_popupGap: popupGap.value
 
     Kirigami.FormLayout {
         Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Weather" }
@@ -62,6 +63,13 @@ KCM.SimpleKCM {
             id: popupRadius
             Kirigami.FormData.label: "Corner radius:"
             from: 0; to: 48
+            textFromValue: v => v + " px"
+            valueFromText: t => parseInt(t)
+        }
+        QQC2.SpinBox {
+            id: popupGap
+            Kirigami.FormData.label: "Distance from the widget:"
+            from: -8; to: 60
             textFromValue: v => v + " px"
             valueFromText: t => parseInt(t)
         }

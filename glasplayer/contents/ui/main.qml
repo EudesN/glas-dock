@@ -163,6 +163,7 @@ PlasmoidItem {
             id: popup
             anchorItem: compact
             edge: Plasmoid.location
+            gap: root.cfg.popupGap
             screenGeometry: Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0)
             style: root.cfg.popupStyle
             backgroundOpacity: root.cfg.popupOpacity

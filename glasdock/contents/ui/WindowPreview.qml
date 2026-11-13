@@ -20,7 +20,7 @@ PlasmaCore.Dialog {
     property var windows: []
     property real anchorX: 0          // global x of the icon center
     property real anchorTop: 0        // global y of the top of the dock bar
-    property int gap: 10
+    property int gap: 4
     property rect screenGeometry: Qt.rect(0, 0, 0, 0)
     property int thumbWidth: 220
 

@@ -41,7 +41,7 @@
     <entry name="launcherAnimationDuration" type="Int"><default>220</default></entry>
     <entry name="appsButtonIcon" type="String"><default>start-here</default></entry>
     <entry name="transparentPanel" type="Bool"><default>true</default></entry>
-    <entry name="launcherGap" type="Int"><default>12</default></entry>
+    <entry name="launcherGap" type="Int"><default>4</default></entry>
     <entry name="launcherIconSize" type="Int"><default>48</default></entry>
     <entry name="launcherOpacity" type="Double"><default>0.0</default></entry>
     <entry name="launcherStyle" type="Int"><default>4</default></entry>
