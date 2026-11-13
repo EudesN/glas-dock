@@ -8,6 +8,7 @@ import org.kde.plasma.plasma5support as P5Support
 KCM.SimpleKCM {
     property alias cfg_city: city.text
     property alias cfg_fahrenheit: fahrenheit.checked
+    property alias cfg_iconBadges: iconBadges.checked
     property alias cfg_showCity: showCity.checked
     property alias cfg_pillBackground: pillBackground.checked
     // style 4 (the old "Blur" style) shows as Glass with blur on
@@ -29,6 +30,7 @@ KCM.SimpleKCM {
             placeholderText: "e.g. Teresina"
         }
         QQC2.CheckBox { id: fahrenheit; text: "Use Fahrenheit" }
+        QQC2.CheckBox { id: iconBadges; Kirigami.FormData.label: "Icons:"; text: "Glasdock badge icons (otherwise the icon theme's)" }
         QQC2.Label {
             Layout.maximumWidth: Kirigami.Units.gridUnit * 22
             wrapMode: Text.WordWrap

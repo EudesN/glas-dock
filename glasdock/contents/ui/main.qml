@@ -136,6 +136,7 @@ PlasmoidItem {
         sourceComponent: Widgets.WeatherData {
             city: Plasmoid.configuration.weatherCity
             fahrenheit: Plasmoid.configuration.weatherFahrenheit
+            useBadges: Plasmoid.configuration.weatherBadges
         }
     }
     readonly property var weatherData: weatherLoader.item

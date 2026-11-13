@@ -20,6 +20,7 @@ PlasmoidItem {
         id: weatherSource
         city: root.cfg.city
         fahrenheit: root.cfg.fahrenheit
+        useBadges: root.cfg.iconBadges
     }
     readonly property bool ready: weatherSource.ready
 

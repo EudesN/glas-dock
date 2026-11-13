@@ -9,6 +9,9 @@ Item {
     id: data
 
     property string city: ""
+    // Glasdock's own badge icons (shared/images/weather) instead of the
+    // icon theme's weather icons
+    property bool useBadges: true
     property bool fahrenheit: false
 
     property string place: ""
@@ -93,8 +96,29 @@ Item {
         });
     }
 
-    // WMO weather code -> Breeze icon name
+    // WMO weather code -> condition used by the badge set
+    function badgeKind(code) {
+        if (code === 0) return "clear";
+        if (code === 1 || code === 2) return "partly";
+        if (code === 3) return "cloudy";
+        if (code === 45 || code === 48) return "fog";
+        if (code >= 51 && code <= 57) return "drizzle";
+        if ((code >= 61 && code <= 65) || (code >= 80 && code <= 82)) return "rain";
+        if (code === 66 || code === 67) return "freezing";
+        if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "snow";
+        if (code >= 95) return "storm";
+        return "unknown";
+    }
+
+    // icon for a WMO code: a badge image, or a Breeze icon name
     function iconFor(code, isDay) {
+        if (useBadges)
+            return Qt.resolvedUrl("images/weather/" + badgeKind(code) + (isDay === false ? "-night" : "-day") + ".svg");
+        return themeIconFor(code, isDay);
+    }
+
+    // WMO weather code -> Breeze icon name
+    function themeIconFor(code, isDay) {
         const n = isDay === false ? "-night" : "";
         if (code === 0) return "weather-clear" + n;
         if (code === 1 || code === 2) return "weather-few-clouds" + n;

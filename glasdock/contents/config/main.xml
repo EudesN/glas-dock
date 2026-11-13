@@ -33,6 +33,7 @@
     <entry name="showClock" type="Bool"><default>false</default></entry>
     <entry name="weatherCity" type="String"><default></default></entry>
     <entry name="weatherFahrenheit" type="Bool"><default>false</default></entry>
+    <entry name="weatherBadges" type="Bool"><default>true</default></entry>
     <entry name="showBorder" type="Bool"><default>true</default></entry>
     <entry name="showShadow" type="Bool"><default>true</default></entry>
     <entry name="showBadges" type="Bool"><default>true</default></entry>
