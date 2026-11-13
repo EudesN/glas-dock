@@ -11,7 +11,6 @@ import org.kde.kirigami as Kirigami
 import org.kde.taskmanager as TaskManager
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.notificationmanager as NotificationManager
-import org.kde.plasma.private.mpris as Mpris
 import "widgets" as Widgets
 
 PlasmoidItem {
@@ -123,13 +122,23 @@ PlasmoidItem {
     }
 
     // ------------------------------------------------------ dock widgets data
-    Mpris.Mpris2Model { id: mpris2Model }
-
-    Widgets.WeatherData {
-        id: weatherData
-        city: Plasmoid.configuration.showWeather ? Plasmoid.configuration.weatherCity : ""
-        fahrenheit: Plasmoid.configuration.weatherFahrenheit
+    // Only created while the matching widget is enabled.
+    Loader {
+        id: mprisLoader
+        active: Plasmoid.configuration.showPlayer
+        sourceComponent: Widgets.MprisSource {}
     }
+    readonly property var activePlayer: mprisLoader.item ? mprisLoader.item.player : null
+
+    Loader {
+        id: weatherLoader
+        active: Plasmoid.configuration.showWeather
+        sourceComponent: Widgets.WeatherData {
+            city: Plasmoid.configuration.weatherCity
+            fahrenheit: Plasmoid.configuration.weatherFahrenheit
+        }
+    }
+    readonly property var weatherData: weatherLoader.item
 
     property date now: new Date()
     Timer {
@@ -513,7 +522,7 @@ PlasmoidItem {
                 width: Math.round(dock.baseIcon * 3.8)
                 height: parent.height
                 isDark: dock.isDark
-                player: mpris2Model.currentPlayer
+                player: root.activePlayer
                 active: dock.popupOpenFor(playerTile)
                 onClicked: dock.toggleWidgetPopup(playerTile, playerPopupComponent)
             }
@@ -523,7 +532,7 @@ PlasmoidItem {
                 width: Math.round(dock.baseIcon * 2.4)
                 height: parent.height
                 isDark: dock.isDark
-                weather: weatherData
+                weather: root.weatherData
                 active: dock.popupOpenFor(weatherTile)
                 onClicked: dock.toggleWidgetPopup(weatherTile, weatherPopupComponent)
             }
@@ -539,8 +548,8 @@ PlasmoidItem {
             }
         }
 
-        Component { id: playerPopupComponent; Widgets.PlayerPopup { player: mpris2Model.currentPlayer; accent: dock.accent; isDark: dock.isDark } }
-        Component { id: weatherPopupComponent; Widgets.WeatherPopup { weather: weatherData; accent: dock.accent; isDark: dock.isDark } }
+        Component { id: playerPopupComponent; Widgets.PlayerPopup { player: root.activePlayer; accent: dock.accent; isDark: dock.isDark } }
+        Component { id: weatherPopupComponent; Widgets.WeatherPopup { weather: root.weatherData; accent: dock.accent; isDark: dock.isDark } }
         Component { id: clockPopupComponent; Widgets.ClockPopup { now: root.now; accent: dock.accent; isDark: dock.isDark } }
 
         property double widgetPopupHiddenAt: 0
@@ -591,9 +600,12 @@ PlasmoidItem {
             visible: false
 
             onVisibleChanged: {
-                if (!visible)
+                if (!visible) {
                     dock.widgetPopupHiddenAt = Date.now();
-                else
+                    // destroy the panel content: no timers/bindings left running
+                    // (e.g. the player's position polling) while it is closed
+                    widgetPopupLoader.sourceComponent = undefined;
+                } else
                     popupFrame.playOpen();
                 Plasmoid.status = visible || launcher.visible ? PlasmaCore.Types.RequiresAttentionStatus
                                                               : PlasmaCore.Types.ActiveStatus;

@@ -5,7 +5,7 @@
  */
 import QtQuick
 
-QtObject {
+Item {
     id: data
 
     property string city: ""
@@ -42,6 +42,8 @@ QtObject {
     }
 
     function geocode() {
+        latitude = NaN;
+        longitude = NaN;
         current = null;
         daily = [];
         error = "";
@@ -121,9 +123,10 @@ QtObject {
         return "";
     }
 
-    property Timer refresh: Timer {
+    Timer {
         interval: 15 * 60 * 1000
-        running: true
+        // only while a place is known
+        running: !isNaN(data.latitude) && !isNaN(data.longitude)
         repeat: true
         onTriggered: data.fetch()
     }
