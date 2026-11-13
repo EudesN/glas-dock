@@ -35,7 +35,16 @@ KCM.SimpleKCM {
         QQC2.ComboBox {
             id: popupStyle
             Kirigami.FormData.label: "Style:"
-            model: ["Glass", "Frosted", "Clear", "Solid"]
+            model: ["Glass", "Frosted", "Clear", "Solid", "Blur (real blur)"]
+        }
+
+        QQC2.Label {
+            visible: popupStyle.currentIndex === 4
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 22
+            wrapMode: Text.WordWrap
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            text: "Blur uses Plasma's own background: the desktop behind is really blurred and the corner shape follows the Plasma theme."
         }
         RowLayout {
             Kirigami.FormData.label: "Opacity:"

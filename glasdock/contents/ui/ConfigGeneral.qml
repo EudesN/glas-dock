@@ -81,7 +81,16 @@ KCM.SimpleKCM {
         QQC2.ComboBox {
             id: dockStyle
             Kirigami.FormData.label: "Style:"
-            model: ["Glass", "Frosted", "Clear (no background)", "Solid"]
+            model: ["Glass", "Frosted", "Clear (no background)", "Solid", "Blur (real blur)"]
+        }
+
+        QQC2.Label {
+            visible: dockStyle.currentIndex === 4
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 22
+            wrapMode: Text.WordWrap
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            text: "Blur uses Plasma's own background, so the desktop behind is really blurred and the corner shape follows the Plasma theme. The panel becomes as tall as the bar (floating), so icon zoom and hover names are turned off."
         }
 
         RowLayout {

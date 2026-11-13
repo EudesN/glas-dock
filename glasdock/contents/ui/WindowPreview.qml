@@ -35,6 +35,7 @@ PlasmaCore.Dialog {
     property bool showShadow: true
 
     readonly property bool hovered: frameHover.hovered
+    readonly property bool themeBlur: style === 4
 
     signal activateRequested(int row, int child)
     signal closeRequested(int row, int child)
@@ -42,7 +43,7 @@ PlasmaCore.Dialog {
     type: PlasmaCore.Dialog.Tooltip
     flags: Qt.WindowDoesNotAcceptFocus | Qt.WindowStaysOnTopHint
     location: PlasmaCore.Types.Floating
-    backgroundHints: PlasmaCore.Dialog.NoBackground
+    backgroundHints: themeBlur ? PlasmaCore.Dialog.StandardBackground : PlasmaCore.Dialog.NoBackground
     hideOnWindowDeactivate: false
     visible: false
 
@@ -51,7 +52,9 @@ PlasmaCore.Dialog {
     onHeightChanged: if (visible) reposition()
 
     function reposition() {
-        const w = frame.width, h = frame.height, m = frame.shadowMargin;
+        const w = frame.width + (themeBlur ? margins.left + margins.right : 0);
+        const h = frame.height + (themeBlur ? margins.top + margins.bottom : 0);
+        const m = frame.shadowMargin;
         let nx = Math.round(anchorX - w / 2);
         const g = screenGeometry;
         if (g.width > 0) {
@@ -64,7 +67,7 @@ PlasmaCore.Dialog {
 
     mainItem: Item {
         id: frame
-        readonly property int shadowMargin: 28
+        readonly property int shadowMargin: preview.themeBlur ? 0 : 28
         readonly property int padding: Kirigami.Units.largeSpacing
         readonly property int columns: Math.min(Math.max(1, preview.windows.length), 4)
 

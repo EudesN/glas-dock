@@ -77,34 +77,6 @@ Item {
                     font: Kirigami.Theme.smallFont
                     elide: Text.ElideRight
                 }
-
-                // controls
-                RowLayout {
-                    Layout.topMargin: Kirigami.Units.smallSpacing
-                    spacing: Kirigami.Units.mediumSpacing
-
-                    GlassButton {
-                        iconName: "media-skip-backward"
-                        isDark: popup.isDark
-                        enabled: popup.hasPlayer && popup.player.canGoPrevious
-                        onClicked: popup.player.Previous()
-                    }
-                    GlassButton {
-                        iconName: popup.playing ? "media-playback-pause" : "media-playback-start"
-                        iconSize: Kirigami.Units.iconSizes.medium
-                        filled: true
-                        accent: popup.accent
-                        isDark: popup.isDark
-                        enabled: popup.hasPlayer
-                        onClicked: popup.player.PlayPause()
-                    }
-                    GlassButton {
-                        iconName: "media-skip-forward"
-                        isDark: popup.isDark
-                        enabled: popup.hasPlayer && popup.player.canGoNext
-                        onClicked: popup.player.Next()
-                    }
-                }
             }
         }
 
@@ -151,6 +123,34 @@ Item {
                 PC3.Label { text: popup.hasPlayer ? popup.fmt(popup.player.position) : ""; font: Kirigami.Theme.smallFont; opacity: 0.6 }
                 Item { Layout.fillWidth: true }
                 PC3.Label { text: popup.hasPlayer ? popup.fmt(popup.player.length) : ""; font: Kirigami.Theme.smallFont; opacity: 0.6 }
+            }
+        }
+
+        // controls, centered under the progress bar
+        RowLayout {
+            Layout.alignment: Qt.AlignHCenter
+            spacing: Kirigami.Units.largeSpacing
+
+            GlassButton {
+                iconName: "media-skip-backward"
+                isDark: popup.isDark
+                enabled: popup.hasPlayer && popup.player.canGoPrevious
+                onClicked: popup.player.Previous()
+            }
+            GlassButton {
+                iconName: popup.playing ? "media-playback-pause" : "media-playback-start"
+                iconSize: Kirigami.Units.iconSizes.medium
+                filled: true
+                accent: popup.accent
+                isDark: popup.isDark
+                enabled: popup.hasPlayer
+                onClicked: popup.player.PlayPause()
+            }
+            GlassButton {
+                iconName: "media-skip-forward"
+                isDark: popup.isDark
+                enabled: popup.hasPlayer && popup.player.canGoNext
+                onClicked: popup.player.Next()
             }
         }
 

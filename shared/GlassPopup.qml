@@ -20,7 +20,7 @@ PlasmaCore.Dialog {
     // used to keep the panel fully on screen when the widget sits near an edge
     property rect screenGeometry: Qt.rect(0, 0, 0, 0)
     property alias sourceComponent: loader.sourceComponent
-    readonly property Item contentItem: loader.item
+    readonly property Item loadedItem: loader.item
 
     // look
     property int style: 0
@@ -32,13 +32,15 @@ PlasmaCore.Dialog {
     property int animationDuration: 220
 
     readonly property bool closing: closeAnim.running
+    // "Blur" style: Plasma draws the (blurred) background and the shadow
+    readonly property bool themeBlur: style === 4
     property double hiddenAt: 0
     readonly property bool fromTop: edge !== PlasmaCore.Types.BottomEdge
 
     type: PlasmaCore.Dialog.AppletPopup
     flags: Qt.WindowStaysOnTopHint
     location: PlasmaCore.Types.Floating
-    backgroundHints: PlasmaCore.Dialog.NoBackground
+    backgroundHints: themeBlur ? PlasmaCore.Dialog.StandardBackground : PlasmaCore.Dialog.NoBackground
     hideOnWindowDeactivate: !animated
     visible: false
 
@@ -81,7 +83,10 @@ PlasmaCore.Dialog {
         if (!anchorItem)
             return;
         const p = anchorItem.mapToGlobal(0, 0);
-        const w = frame.width, h = frame.height, m = frame.shadowMargin;
+        // window size = content + Plasma's frame margins (Blur) or our shadow margin
+        const w = frame.width + (themeBlur ? margins.left + margins.right : 0);
+        const h = frame.height + (themeBlur ? margins.top + margins.bottom : 0);
+        const m = frame.shadowMargin;
         let nx = Math.round(p.x + anchorItem.width / 2 - w / 2);
         const g = screenGeometry;
         if (g.width > 0) {
@@ -97,7 +102,7 @@ PlasmaCore.Dialog {
 
     mainItem: Item {
         id: frame
-        readonly property int shadowMargin: 28
+        readonly property int shadowMargin: popup.themeBlur ? 0 : 28
         readonly property int padding: Kirigami.Units.gridUnit
         readonly property int dur: Math.round(popup.animationDuration * Kirigami.Units.longDuration / 200)
         readonly property bool animatedNow: popup.animated && dur >= 10

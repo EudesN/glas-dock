@@ -1,6 +1,8 @@
 /*
  * Glasdock — the glass look shared by the dock, its panels and the panel widgets.
- * style: 0 = Glass, 1 = Frosted, 2 = Clear (no background), 3 = Solid
+ * style: 0 = Glass, 1 = Frosted, 2 = Clear (no background), 3 = Solid,
+ *        4 = Blur: the window/panel draws Plasma's own background (with real
+ *            KWin blur); this item only adds the sheen and accent tint on top
  */
 import QtQuick
 import org.kde.kirigami as Kirigami
@@ -19,9 +21,10 @@ Item {
     // panels keep a minimum body so their text stays readable in "Clear"
     property bool forceBody: false
 
-    readonly property bool isGlass: style === 0
+    readonly property bool isBlur: style === 4
+    readonly property bool isGlass: style === 0 || style === 4
     readonly property bool isFrosted: style === 1
-    readonly property bool hasBody: style !== 2 || forceBody
+    readonly property bool hasBody: (style !== 2 || forceBody) && !isBlur
     readonly property real bodyAlpha: style === 3 ? 1
         : style === 1 ? Math.max(0.45, backgroundOpacity)
         : style === 2 ? 0.55
@@ -36,7 +39,7 @@ Item {
             : surface.style === 3 ? Kirigami.Theme.backgroundColor
             : surface.isDark ? Qt.rgba(0.10, 0.10, 0.12, Math.min(1, surface.bodyAlpha + (surface.isGlass ? 0.12 : 0)))
             : Qt.rgba(1, 1, 1, surface.bodyAlpha)
-        border.width: surface.showBorder ? 1 : 0
+        border.width: surface.showBorder && !surface.isBlur ? 1 : 0
         border.color: surface.isFrosted ? Qt.rgba(1, 1, 1, surface.isDark ? 0.12 : 0.35)
             : Qt.rgba(1, 1, 1, surface.isDark ? 0.18 : 0.45)
         shadow.size: surface.showShadow && surface.hasBody ? 22 : 0
@@ -74,7 +77,7 @@ Item {
         radius: surface.r - 1
         color: surface.accent
         opacity: surface.accentTint
-        visible: opacity > 0 && surface.hasBody
+        visible: opacity > 0 && (surface.hasBody || surface.isBlur)
     }
 
     // vertical sheen (light from above) — glass only
