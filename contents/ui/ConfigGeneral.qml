@@ -8,6 +8,14 @@ KCM.SimpleKCM {
     property alias cfg_iconSize: iconSize.value
     property alias cfg_iconSpacing: iconSpacing.value
     property alias cfg_centeredZoom: centeredZoom.checked
+    property alias cfg_allowReorder: allowReorder.checked
+    property alias cfg_useAccentColor: useAccentColor.checked
+    property alias cfg_glassAccentTint: glassAccentTint.value
+    property alias cfg_dockStyle: dockStyle.currentIndex
+    property alias cfg_showBorder: showBorder.checked
+    property alias cfg_showShadow: showShadow.checked
+    property alias cfg_showBadges: showBadges.checked
+    property alias cfg_badgeUseAccent: badgeUseAccent.checked
     property alias cfg_launcherAnimation: launcherAnimation.checked
     property alias cfg_launcherAnimationDuration: launcherAnimationDuration.value
     property alias cfg_maxZoom: maxZoom.value
@@ -63,10 +71,41 @@ KCM.SimpleKCM {
             QQC2.Label { text: zoomRange.value.toFixed(1) + " icons" }
         }
 
+        QQC2.ComboBox {
+            id: dockStyle
+            Kirigami.FormData.label: "Style:"
+            model: ["Glass", "Frosted", "Clear (no background)", "Solid"]
+        }
+
         RowLayout {
-            Kirigami.FormData.label: "Glass opacity:"
+            Kirigami.FormData.label: "Background opacity:"
+            enabled: dockStyle.currentIndex === 0 || dockStyle.currentIndex === 1
             QQC2.Slider { id: glassOpacity; from: 0.0; to: 0.8; stepSize: 0.01 }
             QQC2.Label { text: Math.round(glassOpacity.value * 100) + "%" }
+        }
+
+        QQC2.CheckBox {
+            id: showBorder
+            Kirigami.FormData.label: "Details:"
+            text: "Border"
+        }
+
+        QQC2.CheckBox {
+            id: showShadow
+            text: "Shadow"
+            enabled: dockStyle.currentIndex !== 2
+        }
+
+        QQC2.CheckBox {
+            id: useAccentColor
+            Kirigami.FormData.label: "Accent color:"
+            text: "Use the system accent color for the dock details"
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: "Accent tint on glass:"
+            QQC2.Slider { id: glassAccentTint; from: 0.0; to: 0.5; stepSize: 0.01 }
+            QQC2.Label { text: Math.round(glassAccentTint.value * 100) + "%" }
         }
 
         QQC2.SpinBox {
@@ -92,8 +131,25 @@ KCM.SimpleKCM {
         }
 
         QQC2.CheckBox {
-            id: showLabels
+            id: showBadges
+            Kirigami.FormData.label: "Notifications:"
+            text: "Show a badge on apps with unread notifications"
+        }
+
+        QQC2.CheckBox {
+            id: badgeUseAccent
+            text: "Use the system accent color for badges (otherwise red)"
+            enabled: showBadges.checked
+        }
+
+        QQC2.CheckBox {
+            id: allowReorder
             Kirigami.FormData.label: "Behavior:"
+            text: "Drag icons to reorder them"
+        }
+
+        QQC2.CheckBox {
+            id: showLabels
             text: "Show app name on hover"
         }
 

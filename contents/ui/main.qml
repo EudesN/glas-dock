@@ -10,6 +10,7 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import org.kde.taskmanager as TaskManager
 import org.kde.plasma.plasma5support as P5Support
+import org.kde.notificationmanager as NotificationManager
 
 PlasmoidItem {
     id: root
@@ -55,6 +56,58 @@ PlasmoidItem {
               && Plasmoid.formFactor === PlasmaCore.Types.Horizontal
         restoreMode: Binding.RestoreBindingOrValue
     }
+
+    // ------------------------------------------------------- notification badges
+    // Count of unread notifications in Plasma's notification history, per app
+    // (desktop entry). Cleared when the notifications are read in the history.
+    property var notifCounts: ({})
+
+    // "applications:org.telegram.desktop.desktop", "file:///…/x.desktop",
+    // "/usr/share/applications/x.desktop", "firefox" -> lowercase id without .desktop
+    function appKey(s) {
+        if (!s)
+            return "";
+        s = s.toString().replace(/^application:\/\//, "").replace(/^applications:/, "");
+        s = s.substring(s.lastIndexOf("/") + 1).replace(/\.desktop$/, "");
+        return s.toLowerCase();
+    }
+
+    function badgeFor(appId, launcherUrl) {
+        const a = appKey(appId), b = appKey(launcherUrl);
+        return Math.max(notifCounts[a] || 0, notifCounts[b] || 0);
+    }
+
+    NotificationManager.Notifications {
+        id: notifModel
+        showNotifications: true
+        showJobs: false
+        showExpired: true
+        showDismissed: false
+        groupMode: NotificationManager.Notifications.GroupDisabled
+    }
+    Connections {
+        target: notifModel
+        function onCountChanged() { recountTimer.restart(); }
+        function onDataChanged() { recountTimer.restart(); }
+        function onModelReset() { recountTimer.restart(); }
+    }
+    Timer {
+        id: recountTimer
+        interval: 150
+        onTriggered: {
+            const counts = {};
+            for (let i = 0; i < notifModel.count; i++) {
+                const idx = notifModel.index(i, 0);
+                if (notifModel.data(idx, NotificationManager.Notifications.ReadRole))
+                    continue;
+                const k = root.appKey(notifModel.data(idx, NotificationManager.Notifications.DesktopEntryRole));
+                if (k)
+                    counts[k] = (counts[k] || 0) + 1;
+            }
+            root.notifCounts = counts;
+        }
+    }
+    Component.onCompleted: recountTimer.start()
 
     // Runs shell commands (power actions)
     P5Support.DataSource {
@@ -129,6 +182,51 @@ PlasmoidItem {
             }
         }
 
+        // --- system accent color for the dock details (dots, labels, tint)
+        // on dark glass, dark accents (e.g. picked from the wallpaper) are lifted
+        // a bit so the details stay visible
+        readonly property color accent: isDark
+            && Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.highlightColor) === Kirigami.ColorUtils.Dark
+            ? Qt.lighter(Kirigami.Theme.highlightColor, 1.5) : Kirigami.Theme.highlightColor
+        readonly property color detailColor: cfg.useAccentColor ? accent
+            : (isDark ? "white" : Qt.rgba(0, 0, 0, 0.75))
+
+        // --- drag to reorder
+        property Item dragItem: null    // delegate being dragged (identity survives moves)
+        property Item droppedItem: null // just released: animates into its slot
+        property real dragX: 0          // pointer x (dock coordinates)
+        readonly property bool dragging: dragItem !== null
+
+        function reorderTo(from, px) {
+            const b = baseIcon, sp = spacing;
+            const left0 = (width - restWidth) / 2;
+            const slotAt = Math.round((px - left0 - b / 2) / (b + sp));
+            const to = Math.max(0, Math.min(count - 1, slotAt - offset));
+            if (to !== from)
+                tasksModel.move(from, to);
+        }
+
+        // keeps a dragged icon (width w) inside the glass bar, after the apps
+        // button; returns the clamped pointer x
+        function clampDragX(px, w) {
+            const lo = (offset === 1 ? layout.xs[0] + layout.sizes[0] + spacing : layout.x0) + w / 2;
+            const hi = layout.x0 + layout.total - w / 2;
+            return Math.max(lo, Math.min(hi, px));
+        }
+
+        function endDrag() {
+            droppedItem = dragItem;
+            dragItem = null;
+            dropTimer.restart();
+            tasksModel.syncLaunchers(); // saves the new order of pinned apps
+        }
+
+        Timer {
+            id: dropTimer
+            interval: 220
+            onTriggered: dock.droppedItem = null
+        }
+
         readonly property bool isDark: Kirigami.ColorUtils.brightnessForColor(
             Kirigami.Theme.backgroundColor) === Kirigami.ColorUtils.Dark
 
@@ -143,7 +241,8 @@ PlasmoidItem {
         HoverHandler {
             id: hover
             readonly property real px: point.position.x
-            onPxChanged: if (hovered) dock.mouseX = px
+            // while dragging, mouseX is driven by the (clamped) drag position
+            onPxChanged: if (hovered && !dock.dragging) dock.mouseX = px
         }
 
         // --- layout: size and position of each icon
@@ -186,21 +285,66 @@ PlasmoidItem {
             height: dock.barHeight
             readonly property real r: Math.min(dock.cfg.cornerRadius, height / 2)
 
-            // translucent body + border + shadow
+            // 0 = Glass, 1 = Frosted, 2 = Clear (no background), 3 = Solid
+            readonly property int style: dock.cfg.dockStyle
+            readonly property bool isGlass: style === 0
+            readonly property bool isFrosted: style === 1
+            readonly property bool hasBody: style !== 2
+            readonly property real bodyAlpha: style === 3 ? 1
+                : style === 1 ? Math.max(0.45, dock.cfg.glassOpacity) : dock.cfg.glassOpacity
+
+            // body + border + shadow
             Kirigami.ShadowedRectangle {
                 anchors.fill: parent
                 radius: glass.r
-                color: dock.isDark ? Qt.rgba(0.10, 0.10, 0.12, dock.cfg.glassOpacity + 0.12)
-                                   : Qt.rgba(1, 1, 1, dock.cfg.glassOpacity)
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, dock.isDark ? 0.18 : 0.45)
-                shadow.size: 22
+                color: !glass.hasBody ? "transparent"
+                    : glass.style === 3 ? Kirigami.Theme.backgroundColor
+                    : dock.isDark ? Qt.rgba(0.10, 0.10, 0.12, Math.min(1, glass.bodyAlpha + (glass.isGlass ? 0.12 : 0)))
+                    : Qt.rgba(1, 1, 1, glass.bodyAlpha)
+                border.width: dock.cfg.showBorder ? 1 : 0
+                border.color: glass.isFrosted ? Qt.rgba(1, 1, 1, dock.isDark ? 0.12 : 0.35)
+                    : Qt.rgba(1, 1, 1, dock.isDark ? 0.18 : 0.45)
+                shadow.size: dock.cfg.showShadow && glass.hasBody ? 22 : 0
                 shadow.yOffset: 6
                 shadow.color: Qt.rgba(0, 0, 0, dock.isDark ? 0.45 : 0.22)
             }
 
-            // vertical sheen (light from above)
+            // frosted: milky veil + fine grain
             Rectangle {
+                visible: glass.isFrosted
+                anchors.fill: parent
+                anchors.margins: 1
+                radius: glass.r - 1
+                color: Qt.rgba(1, 1, 1, dock.isDark ? 0.06 : 0.20)
+            }
+            Kirigami.ShadowedTexture {
+                visible: glass.isFrosted
+                anchors.fill: parent
+                anchors.margins: 1
+                radius: glass.r - 1
+                color: "transparent"
+                opacity: dock.isDark ? 0.55 : 0.8
+                source: Image {
+                    source: Qt.resolvedUrl("../images/noise.png")
+                    fillMode: Image.Stretch
+                    smooth: false
+                    visible: false
+                }
+            }
+
+            // accent tint
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 1
+                radius: glass.r - 1
+                color: dock.accent
+                opacity: dock.cfg.glassAccentTint
+                visible: opacity > 0 && glass.hasBody
+            }
+
+            // vertical sheen (light from above) — glass only
+            Rectangle {
+                visible: glass.isGlass
                 anchors.fill: parent
                 anchors.margins: 1
                 radius: glass.r - 1
@@ -213,6 +357,7 @@ PlasmoidItem {
 
             // specular highlight on the top edge
             Rectangle {
+                visible: glass.isGlass
                 anchors.top: parent.top
                 anchors.topMargin: 1
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -228,6 +373,7 @@ PlasmoidItem {
 
             // faint refracted glow on the bottom edge
             Rectangle {
+                visible: glass.isGlass
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 1
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -288,7 +434,12 @@ PlasmoidItem {
 
             MouseArea {
                 id: appsMouse
+                // same hit area rules as the app icons
                 anchors.fill: parent
+                anchors.leftMargin: -dock.pad
+                anchors.rightMargin: -(dock.slots === 1 ? dock.pad : dock.spacing / 2)
+                anchors.topMargin: Math.min(0, dock.barY - appsButton.y)
+                anchors.bottomMargin: -(dock.barY + dock.barHeight - appsButton.y - appsButton.height)
                 hoverEnabled: true
                 onClicked: dock.toggleLauncher()
             }
@@ -382,14 +533,22 @@ PlasmoidItem {
                 visible: laidOut
                 readonly property real size: dock.layout.sizes[slot] ?? dock.baseIcon
                 readonly property bool isLauncher: model.IsLauncher === true
+                readonly property int badgeCount: root.badgeFor(model.AppId, model.LauncherUrlWithoutIcon)
                 property real bounce: 0
                 property bool launching: false
 
-                x: dock.layout.xs[slot] ?? 0
+                readonly property bool dragged: dock.dragItem === task
+                x: dragged ? dock.dragX - width / 2 : (dock.layout.xs[slot] ?? 0)
+                Behavior on x {
+                    // the other icons slide into their new places while dragging
+                    enabled: (dock.dragging && !task.dragged) || dock.droppedItem === task
+                    NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+                }
                 y: dock.barY + dock.pad + dock.baseIcon - size - bounce
                 width: size
                 height: size
-                z: mouse.containsMouse ? 10 : 1
+                z: dragged ? 20 : (mouse.containsMouse ? 10 : 1)
+                opacity: dragged ? 0.85 : 1
 
                 onIsLauncherChanged: if (!isLauncher) launching = false
 
@@ -478,23 +637,72 @@ PlasmoidItem {
                     Behavior on opacity { NumberAnimation { duration: 90 } }
                 }
 
-                // running indicator
+                // notification badge (top-right of the icon):
+                // a plain dot for a single notification, the number when there are more
                 Rectangle {
-                    visible: !task.isLauncher
-                    width: 5
+                    id: badge
+                    readonly property bool shown: dock.cfg.showBadges && task.badgeCount > 0 && !task.dragged
+                    readonly property bool numeric: task.badgeCount > 1
+                    readonly property real h: Math.max(14, Math.round(task.size * 0.34))
+                    readonly property real dotSize: Math.max(8, Math.round(h * 0.55))
+                    height: numeric ? h : dotSize
+                    width: numeric ? Math.max(h, badgeText.implicitWidth + h * 0.55) : dotSize
+                    radius: height / 2
+                    x: numeric ? task.width - width * 0.8 : task.width - width * 0.9
+                    y: numeric ? -h * 0.15 : -dotSize * 0.1
+                    z: 5
+                    // system accent color by default (red is the alternative)
+                    color: dock.cfg.badgeUseAccent ? dock.accent : "#ff3b30"
+                    border.width: 1
+                    border.color: Qt.rgba(0, 0, 0, 0.18)
+                    scale: shown ? 1 : 0
+                    visible: scale > 0
+                    Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack } }
+
+                    Text {
+                        id: badgeText
+                        visible: badge.numeric
+                        anchors.centerIn: parent
+                        text: task.badgeCount > 99 ? "99+" : task.badgeCount
+                        // dark text on light accents, white otherwise
+                        color: Kirigami.ColorUtils.brightnessForColor(badge.color) === Kirigami.ColorUtils.Light
+                               ? "#1d1d1f" : "white"
+                        font.pixelSize: Math.round(badge.h * 0.62)
+                        font.bold: true
+                    }
+                }
+
+                // running indicator
+                // (active app: a wider pill with a soft glow in the accent color)
+                Rectangle {
+                    id: dot
+                    visible: !task.isLauncher && !task.dragged
+                    readonly property bool active: task.model.IsActive === true
+                    width: active ? 12 : 5
                     height: 5
                     radius: 2.5
                     x: (task.width - width) / 2
                     y: dock.barY + dock.barHeight - dock.pad / 2 - height / 2 - task.y
-                    color: dock.isDark ? "white" : Qt.rgba(0, 0, 0, 0.75)
-                    opacity: task.model.IsActive ? 1 : 0.55
+                    color: dock.detailColor
+                    opacity: active ? 1 : 0.6
+                    Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: parent.width + 8
+                        height: parent.height + 8
+                        radius: height / 2
+                        color: dock.detailColor
+                        opacity: dot.active && dock.cfg.useAccentColor ? 0.25 : 0
+                        z: -1
+                    }
                 }
 
                 // app name on hover
                 Rectangle {
                     id: label
                     readonly property bool shown: dock.cfg.showLabels && mouse.containsMouse
-                                                  && !dock.contextMenuOpen
+                                                  && !dock.contextMenuOpen && !dock.dragging
                     opacity: shown ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: 140 } }
@@ -506,7 +714,9 @@ PlasmoidItem {
                     y: Math.max(-task.y, -height - Kirigami.Units.smallSpacing * 2)
                     color: dock.isDark ? Qt.rgba(0.12, 0.12, 0.14, 0.85) : Qt.rgba(1, 1, 1, 0.85)
                     border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, dock.isDark ? 0.15 : 0.6)
+                    border.color: dock.cfg.useAccentColor
+                        ? Qt.rgba(dock.accent.r, dock.accent.g, dock.accent.b, 0.7)
+                        : Qt.rgba(1, 1, 1, dock.isDark ? 0.15 : 0.6)
 
                     Text {
                         id: labelText
@@ -520,10 +730,60 @@ PlasmoidItem {
 
                 MouseArea {
                     id: mouse
+                    // hit area: up to the middle of the gap to each neighbour and
+                    // the full height of the bar (no dead zones between icons or
+                    // over the running-indicator strip)
                     anchors.fill: parent
+                    anchors.leftMargin: -(task.slot === 0 ? dock.pad : dock.spacing / 2)
+                    anchors.rightMargin: -(task.slot === dock.slots - 1 ? dock.pad : dock.spacing / 2)
+                    anchors.topMargin: Math.min(0, dock.barY - task.y)
+                    anchors.bottomMargin: -(dock.barY + dock.barHeight - task.y - task.height)
                     hoverEnabled: true
                     acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+                    preventStealing: true
+
+                    property point pressPos
+                    property bool dragActive: false
+                    property bool suppressClick: false
+
+                    onPressed: m => {
+                        pressPos = Qt.point(m.x, m.y);
+                        dragActive = false;
+                        suppressClick = false;
+                    }
+                    onPositionChanged: m => {
+                        if (!(pressedButtons & Qt.LeftButton) || !dock.cfg.allowReorder)
+                            return;
+                        if (!dragActive && Math.abs(m.x - pressPos.x) > Qt.styleHints.startDragDistance) {
+                            dragActive = true;
+                            dock.dragItem = task;
+                        }
+                        if (dragActive) {
+                            const p = mapToItem(dock, m.x, m.y);
+                            const x = dock.clampDragX(p.x, task.width);
+                            dock.dragX = x;
+                            dock.mouseX = x;
+                            dock.reorderTo(task.index, x);
+                        }
+                    }
+                    onReleased: {
+                        if (dragActive) {
+                            dragActive = false;
+                            suppressClick = true;
+                            dock.endDrag();
+                        }
+                    }
+                    onCanceled: {
+                        if (dragActive) {
+                            dragActive = false;
+                            dock.endDrag();
+                        }
+                    }
                     onClicked: mouseEvent => {
+                        if (suppressClick) {
+                            suppressClick = false;
+                            return;
+                        }
                         if (mouseEvent.button === Qt.LeftButton) {
                             task.activate();
                         } else if (mouseEvent.button === Qt.MiddleButton) {
