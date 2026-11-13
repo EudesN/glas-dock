@@ -47,6 +47,36 @@ Item {
     }
     readonly property real r: Math.min(radius, height / 2)
 
+    // Grain texture, tiled to the surface size (a stretched image showed up as
+    // vertical streaks on large surfaces such as the launcher)
+    Item {
+        id: grainTile
+        width: Math.max(1, surface.width)
+        height: Math.max(1, surface.height)
+        visible: false
+        Image {
+            anchors.fill: parent
+            source: Qt.resolvedUrl("images/noise.png")
+            fillMode: Image.Tile
+            smooth: false
+        }
+    }
+    ShaderEffectSource {
+        id: grainSource
+        sourceItem: grainTile
+        hideSource: true
+        live: false
+        visible: false
+        // re-render when the size changes
+        onWidthChanged: scheduleUpdate()
+        onHeightChanged: scheduleUpdate()
+        width: grainTile.width
+        height: grainTile.height
+    }
+
+    // frost only makes sense on top of the real blur
+    readonly property real frostNow: blurOn ? frost : 0
+
     // body + border + shadow
     Kirigami.ShadowedRectangle {
         anchors.fill: parent
@@ -78,36 +108,26 @@ Item {
         radius: surface.r - 1
         color: "transparent"
         opacity: surface.isDark ? 0.55 : 0.8
-        source: Image {
-            source: Qt.resolvedUrl("images/noise.png")
-            fillMode: Image.Stretch
-            smooth: false
-            visible: false
-        }
+        source: grainSource
     }
 
     // frost veil (blur look): milky layer + grain, amount = frost
     Rectangle {
-        visible: surface.frost > 0
+        visible: surface.frostNow > 0
         anchors.fill: parent
         anchors.margins: 1
         radius: surface.r - 1
-        color: surface.isDark ? Qt.rgba(0.85, 0.85, 0.9, surface.frost * 0.14)
-                              : Qt.rgba(1, 1, 1, surface.frost * 0.45)
+        color: surface.isDark ? Qt.rgba(0.85, 0.85, 0.9, surface.frostNow * 0.14)
+                              : Qt.rgba(1, 1, 1, surface.frostNow * 0.45)
     }
     Kirigami.ShadowedTexture {
-        visible: surface.frost > 0
+        visible: surface.frostNow > 0
         anchors.fill: parent
         anchors.margins: 1
         radius: surface.r - 1
         color: "transparent"
-        opacity: surface.frost * (surface.isDark ? 0.5 : 0.7)
-        source: Image {
-            source: Qt.resolvedUrl("images/noise.png")
-            fillMode: Image.Stretch
-            smooth: false
-            visible: false
-        }
+        opacity: surface.frostNow * (surface.isDark ? 0.5 : 0.7)
+        source: grainSource
     }
 
     // accent tint
