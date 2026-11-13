@@ -452,7 +452,11 @@ PlasmoidItem {
         function toggleLauncher() {
             // a click on the button first deactivates (hides) the popup;
             // don't reopen it right away
-            if (launcher.visible || Date.now() - launcherHiddenAt < 250) {
+            // a click on the button first deactivates the popup (which starts
+            // closing it); don't reopen it right away
+            if (launcherView.closing || Date.now() - launcherHiddenAt < 250)
+                return;
+            if (launcher.visible) {
                 launcherView.playClose();
                 return;
             }
@@ -469,11 +473,14 @@ PlasmoidItem {
             id: launcher
             type: PlasmaCore.Dialog.AppletPopup
             flags: Qt.WindowStaysOnTopHint
-            // BottomEdge makes KWin's "Sliding popups" effect slide the whole
-            // window (frame + blur) up from the dock
-            location: dock.cfg.launcherAnimation ? PlasmaCore.Types.BottomEdge
-                                                 : PlasmaCore.Types.Floating
-            hideOnWindowDeactivate: true
+            // With the theme background, BottomEdge lets KWin's "Sliding popups"
+            // effect slide the whole window (frame + blur) up from the dock. The
+            // custom glass background is animated entirely by Launcher.qml.
+            readonly property bool kwinSlides: dock.cfg.launcherAnimation && !dock.cfg.launcherCustomBackground
+            location: kwinSlides ? PlasmaCore.Types.BottomEdge : PlasmaCore.Types.Floating
+            // closing on deactivation is animated (onActiveChanged) instead
+            hideOnWindowDeactivate: !dock.cfg.launcherAnimation
+            onActiveChanged: if (!active && visible) launcherView.playClose()
             backgroundHints: dock.cfg.launcherCustomBackground ? PlasmaCore.Dialog.NoBackground
                                                                : PlasmaCore.Dialog.StandardBackground
             visible: false
@@ -508,6 +515,7 @@ PlasmoidItem {
                 frameMargins: launcher.margins
                 animated: dock.cfg.launcherAnimation
                 animationDuration: dock.cfg.launcherAnimationDuration
+                windowSlides: launcher.kwinSlides
                 onCloseRequested: playClose()
                 onCloseFinished: launcher.visible = false
                 onRunCommand: cmd => executable.run(cmd)
