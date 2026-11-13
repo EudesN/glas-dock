@@ -339,14 +339,33 @@ PlasmoidItem {
             const p = task.mapToGlobal(task.width / 2, 0);
             windowPreview.anchorX = p.x;
             windowPreview.anchorTop = dock.mapToGlobal(0, glass.y).y;
-            windowPreview.visible = true;
-            windowPreview.reposition();
+            if (windowPreview.visible) {
+                windowPreview.reposition();
+            } else {
+                // let the cards get their size first, so the window appears in
+                // its final place instead of jumping there
+                previewRevealTimer.restart();
+            }
         }
         function hidePreview() {
             previewShowTimer.stop();
             previewHideTimer.stop();
+            previewRevealTimer.stop();
             windowPreview.visible = false;
+            // drop the cards: their window screencasts stop with them
+            windowPreview.windows = [];
             previewTask = null;
+        }
+        Timer {
+            id: previewRevealTimer
+            interval: 30
+            onTriggered: {
+                if (!dock.previewTask)
+                    return;
+                windowPreview.reposition();
+                windowPreview.visible = true;
+                windowPreview.reposition();
+            }
         }
         // called by the task icons
         function previewEnter(task) {
@@ -478,10 +497,18 @@ PlasmoidItem {
             const g = d => d < R ? (Math.cos(Math.PI * d / R) + 1) / 2 : 0;
             const zoomable = i => !(i === 0 && offset === 1 && !cfg.appsButtonZoom);
 
+            // Pointer position used for the zoom, kept within the icons that can
+            // zoom: over the (non-zooming) apps button or past the last icon the
+            // dock behaves as if the pointer were on the nearest app, so the bar
+            // does not shrink and grow again when moving between them.
+            const firstZ = zoomable(0) ? 0 : Math.min(1, n - 1);
+            const zx = n > 0 && cfg.centeredZoom
+                ? Math.max(center(firstZ), Math.min(center(n - 1), mouseX)) : mouseX;
+
             // extra width of each icon for the current pointer position
             let extras = [], sumE = 0;
             for (let i = 0; i < n; i++) {
-                const e = zoomable(i) ? b * z * g(Math.abs(mouseX - center(i))) : 0;
+                const e = zoomable(i) ? b * z * g(Math.abs(zx - center(i))) : 0;
                 extras.push(e);
                 sumE += e;
             }

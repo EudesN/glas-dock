@@ -70,9 +70,17 @@ PlasmaCore.Dialog {
         readonly property int shadowMargin: 28
         readonly property int padding: Kirigami.Units.largeSpacing
         readonly property int columns: Math.min(Math.max(1, preview.windows.length), 4)
+        readonly property int rows: Math.max(1, Math.ceil(preview.windows.length / columns))
+        // card size computed directly (the Grid only lays out once the window
+        // is shown, and the window must have its final size before that)
+        readonly property real cardWidth: preview.thumbWidth + Kirigami.Units.smallSpacing * 2
+        readonly property real cardHeight: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+                                         + Math.round(preview.thumbWidth * 0.62) + Kirigami.Units.smallSpacing * 3
+        readonly property real cardsWidth: columns * cardWidth + (columns - 1) * Kirigami.Units.smallSpacing
+        readonly property real cardsHeight: rows * cardHeight + (rows - 1) * Kirigami.Units.smallSpacing
 
-        width: cards.width + (padding + shadowMargin) * 2
-        height: cards.height + (padding + shadowMargin) * 2
+        width: cardsWidth + (padding + shadowMargin) * 2
+        height: cardsHeight + (padding + shadowMargin) * 2
 
         function fadeIn() {
             panel.opacity = 0;
@@ -122,8 +130,8 @@ PlasmaCore.Dialog {
                         required property var modelData
                         readonly property real thumbHeight: Math.round(preview.thumbWidth * 0.62)
 
-                        width: preview.thumbWidth + Kirigami.Units.smallSpacing * 2
-                        height: header.height + thumbHeight + Kirigami.Units.smallSpacing * 3
+                        width: frame.cardWidth
+                        height: frame.cardHeight
                         radius: Math.round(preview.radius * 0.6)
                         color: cardArea.containsMouse
                             ? (preview.isDark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.55))
