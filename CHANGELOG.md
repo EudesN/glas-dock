@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- New panel widgets **Glasplayer** and **Glasweather** (for the top bar or any
+  panel), with the same glass panels as the dock.
+- Repository reorganized: one folder per widget plus `shared/`, installed with
+  `install.sh`.
+
 ## 0.4.0-alpha.1
 
 - Drag icons to reorder them; the dragged icon stays inside the bar and the

@@ -9,6 +9,7 @@ import org.kde.plasma.components as PC3
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.private.kicker as Kicker
+import "shared" as Widgets
 
 Item {
     id: view
@@ -16,10 +17,17 @@ Item {
     property var appletInterface
     property int iconSize: Kirigami.Units.iconSizes.large
 
-    // Background: theme frame (blurred) + optional tint, or a custom glass
-    // panel without blur. backgroundOpacity is 0..1.
-    property bool customBackground: false
+    // Background style, same list as the dock: 0 Glass, 1 Frosted, 2 Clear,
+    // 3 Solid, 4 Blur. Blur = Plasma's (KWin-blurred) dialog frame plus an
+    // optional tint (backgroundOpacity); the others draw the dock's glass
+    // surface (no blur) with backgroundOpacity as its opacity.
+    property int style: 4
+    readonly property bool customBackground: style !== 4
     property real backgroundOpacity: 0
+    property real radius: 22
+    property color accent: Kirigami.Theme.highlightColor
+    property real accentTint: 0
+    property bool showBorder: true
     property bool isDark: true
     property var frameMargins: null
 
@@ -27,27 +35,40 @@ Item {
     signal closeFinished()
 
     // ---------------------------------------------------------------- animation
-    // Open: fade in, grow from 94% and rise 18 px out of the dock.
+    // Open: fade in and grow out of the dock, then the content below the search
+    // field follows a moment later (staggered). When KWin already slides the
+    // window (theme background), the content only fades/grows a little, so the
+    // two motions do not add up.
     // Close: quick fade/shrink, then closeFinished() hides the window.
     property bool animated: true
     property int animationDuration: 220
+    property bool windowSlides: false
+    // follows Plasma's global animation speed (0 when animations are off)
+    readonly property int dur: Math.round(animationDuration * Kirigami.Units.longDuration / 200)
+    readonly property bool closing: closeAnim.running
+    property real reveal: 1   // 0..1, content below the search field
 
     transformOrigin: Item.Bottom
     transform: Translate { id: rise; y: 0 }
 
     function playOpen() {
         closeAnim.stop();
-        if (!animated) {
-            opacity = 1; scale = 1; rise.y = 0;
+        if (!animated || dur < 10) {
+            opacity = 1; scale = 1; rise.y = 0; reveal = 1;
             return;
         }
-        opacity = 0; scale = 0.94; rise.y = 18;
+        opacity = 0;
+        scale = windowSlides ? 0.98 : 0.94;
+        rise.y = windowSlides ? 0 : 16;
+        reveal = 0;
         openAnim.restart();
     }
 
     function playClose() {
+        if (closeAnim.running)
+            return;
         openAnim.stop();
-        if (!animated || opacity === 0) {
+        if (!animated || dur < 10 || opacity === 0) {
             closeFinished();
             return;
         }
@@ -56,17 +77,21 @@ Item {
 
     ParallelAnimation {
         id: openAnim
-        NumberAnimation { target: view; property: "opacity"; to: 1; duration: view.animationDuration; easing.type: Easing.OutCubic }
-        NumberAnimation { target: view; property: "scale"; to: 1; duration: view.animationDuration; easing.type: Easing.OutBack; easing.overshoot: 1.2 }
-        NumberAnimation { target: rise; property: "y"; to: 0; duration: view.animationDuration; easing.type: Easing.OutCubic }
+        NumberAnimation { target: view; property: "opacity"; to: 1; duration: view.dur * 0.8; easing.type: Easing.OutCubic }
+        NumberAnimation { target: view; property: "scale"; to: 1; duration: view.dur; easing.type: Easing.OutBack; easing.overshoot: 1.05 }
+        NumberAnimation { target: rise; property: "y"; to: 0; duration: view.dur; easing.type: Easing.OutQuint }
+        SequentialAnimation {
+            PauseAnimation { duration: view.dur * 0.3 }
+            NumberAnimation { target: view; property: "reveal"; to: 1; duration: view.dur; easing.type: Easing.OutCubic }
+        }
     }
 
     SequentialAnimation {
         id: closeAnim
         ParallelAnimation {
-            NumberAnimation { target: view; property: "opacity"; to: 0; duration: view.animationDuration * 0.6; easing.type: Easing.InCubic }
-            NumberAnimation { target: view; property: "scale"; to: 0.96; duration: view.animationDuration * 0.6; easing.type: Easing.InCubic }
-            NumberAnimation { target: rise; property: "y"; to: 10; duration: view.animationDuration * 0.6; easing.type: Easing.InCubic }
+            NumberAnimation { target: view; property: "opacity"; to: 0; duration: view.dur * 0.55; easing.type: Easing.InCubic }
+            NumberAnimation { target: view; property: "scale"; to: 0.97; duration: view.dur * 0.55; easing.type: Easing.InCubic }
+            NumberAnimation { target: rise; property: "y"; to: view.windowSlides ? 0 : 8; duration: view.dur * 0.55; easing.type: Easing.InCubic }
         }
         ScriptAction { script: view.closeFinished() }
     }
@@ -141,41 +166,29 @@ Item {
         anchors.rightMargin: view.customBackground ? 0 : -(view.frameMargins?.right ?? 0) + 1
         anchors.topMargin: view.customBackground ? 0 : -(view.frameMargins?.top ?? 0) + 1
         anchors.bottomMargin: view.customBackground ? 0 : -(view.frameMargins?.bottom ?? 0) + 1
-        readonly property real r: view.customBackground ? Kirigami.Units.gridUnit : Kirigami.Units.cornerRadius
 
+        // Blur: tint on top of Plasma's blurred frame
         Rectangle {
+            visible: !view.customBackground
             anchors.fill: parent
-            radius: background.r
+            radius: Kirigami.Units.cornerRadius
             color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g,
                            Kirigami.Theme.backgroundColor.b, view.backgroundOpacity)
-            border.width: view.customBackground ? 1 : 0
-            border.color: Qt.rgba(1, 1, 1, view.isDark ? 0.18 : 0.45)
         }
-        // glass sheen, only for the custom panel
-        Rectangle {
+
+        // other styles: the dock's glass
+        Widgets.GlassSurface {
             visible: view.customBackground
             anchors.fill: parent
-            anchors.margins: 1
-            radius: background.r - 1
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, view.isDark ? 0.10 : 0.30) }
-                GradientStop { position: 0.35; color: Qt.rgba(1, 1, 1, view.isDark ? 0.02 : 0.06) }
-                GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0) }
-            }
-        }
-        Rectangle {
-            visible: view.customBackground
-            anchors.top: parent.top
-            anchors.topMargin: 1
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width - background.r * 2
-            height: 1
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop { position: 0.0; color: "transparent" }
-                GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, view.isDark ? 0.5 : 0.85) }
-                GradientStop { position: 1.0; color: "transparent" }
-            }
+            style: view.style
+            backgroundOpacity: view.backgroundOpacity
+            radius: view.radius
+            isDark: view.isDark
+            accent: view.accent
+            accentTint: view.accentTint
+            showBorder: view.showBorder
+            showShadow: false        // the window has no room for it
+            forceBody: true
         }
     }
 
@@ -200,6 +213,9 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: Kirigami.Units.largeSpacing
+            // staggered reveal
+            opacity: view.reveal
+            transform: Translate { y: (1 - view.reveal) * 10 }
 
             // ---------------------------------------------------- categories
             QQC2.ScrollView {
@@ -375,6 +391,7 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
+            opacity: view.reveal
 
             Item { Layout.fillWidth: true }
 

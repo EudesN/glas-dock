@@ -1,0 +1,20 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "EudesN"
+            }
+        ],
+        "Category": "Multimedia",
+        "Description": "Media player for the panel with a glass panel, from the Glasdock project",
+        "Icon": "media-playback-start",
+        "Id": "com.github.eudesn.glasplayer",
+        "License": "GPL-2.0+",
+        "Name": "Glasplayer",
+        "Version": "0.4.0-alpha.1",
+        "Website": "https://github.com/EudesN/glas-dock",
+        "BugReportUrl": "https://github.com/EudesN/glas-dock/issues"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

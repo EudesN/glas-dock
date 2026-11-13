@@ -3,8 +3,8 @@ import org.kde.plasma.configuration
 
 ConfigModel {
     ConfigCategory {
-        name: "Appearance"
-        icon: "preferences-desktop-color"
+        name: "General"
+        icon: "configure"
         source: "ConfigGeneral.qml"
     }
 }

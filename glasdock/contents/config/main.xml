@@ -20,9 +20,16 @@
     <entry name="iconSpacing" type="Int"><default>7</default></entry>
     <entry name="centeredZoom" type="Bool"><default>true</default></entry>
     <entry name="allowReorder" type="Bool"><default>true</default></entry>
+    <entry name="showPreviews" type="Bool"><default>true</default></entry>
+    <entry name="previewWidth" type="Int"><default>220</default></entry>
     <entry name="useAccentColor" type="Bool"><default>true</default></entry>
     <entry name="glassAccentTint" type="Double"><default>0.0</default></entry>
     <entry name="dockStyle" type="Int"><default>0</default></entry>
+    <entry name="showPlayer" type="Bool"><default>false</default></entry>
+    <entry name="showWeather" type="Bool"><default>false</default></entry>
+    <entry name="showClock" type="Bool"><default>false</default></entry>
+    <entry name="weatherCity" type="String"><default></default></entry>
+    <entry name="weatherFahrenheit" type="Bool"><default>false</default></entry>
     <entry name="showBorder" type="Bool"><default>true</default></entry>
     <entry name="showShadow" type="Bool"><default>true</default></entry>
     <entry name="showBadges" type="Bool"><default>true</default></entry>
@@ -34,7 +41,7 @@
     <entry name="launcherGap" type="Int"><default>12</default></entry>
     <entry name="launcherIconSize" type="Int"><default>48</default></entry>
     <entry name="launcherOpacity" type="Double"><default>0.0</default></entry>
-    <entry name="launcherCustomBackground" type="Bool"><default>false</default></entry>
+    <entry name="launcherStyle" type="Int"><default>4</default></entry>
     <entry name="autoPanelHeight" type="Bool"><default>true</default></entry>
     <entry name="launcherWidth" type="Int"><default>720</default></entry>
     <entry name="launcherHeight" type="Int"><default>540</default></entry>

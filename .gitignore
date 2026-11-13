@@ -2,3 +2,6 @@
 *.qmlc
 *.jsc
 .directory
+
+# shared/ is copied into each widget by install.sh
+*/contents/ui/shared/

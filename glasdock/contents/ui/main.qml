@@ -11,6 +11,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.taskmanager as TaskManager
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.notificationmanager as NotificationManager
+import "shared" as Widgets
 
 PlasmoidItem {
     id: root
@@ -53,6 +54,7 @@ PlasmoidItem {
         property: "backgroundHints"
         value: PlasmaCore.Types.NoBackground
         when: Plasmoid.configuration.transparentPanel
+              && Plasmoid.configuration.dockStyle !== 4   // Blur uses the panel background
               && Plasmoid.formFactor === PlasmaCore.Types.Horizontal
         restoreMode: Binding.RestoreBindingOrValue
     }
@@ -96,6 +98,10 @@ PlasmoidItem {
         interval: 150
         onTriggered: {
             const counts = {};
+            if (!Plasmoid.configuration.showBadges) {
+                root.notifCounts = counts;
+                return;
+            }
             for (let i = 0; i < notifModel.count; i++) {
                 const idx = notifModel.index(i, 0);
                 if (notifModel.data(idx, NotificationManager.Notifications.ReadRole))
@@ -108,6 +114,41 @@ PlasmoidItem {
         }
     }
     Component.onCompleted: recountTimer.start()
+    Connections {
+        target: Plasmoid.configuration
+        function onValueChanged(key, value) {
+            if (key === "showBadges")
+                recountTimer.restart();
+        }
+    }
+
+    // ------------------------------------------------------ dock widgets data
+    // Only created while the matching widget is enabled.
+    Loader {
+        id: mprisLoader
+        active: Plasmoid.configuration.showPlayer
+        sourceComponent: Widgets.MprisSource {}
+    }
+    readonly property var activePlayer: mprisLoader.item ? mprisLoader.item.player : null
+
+    Loader {
+        id: weatherLoader
+        active: Plasmoid.configuration.showWeather
+        sourceComponent: Widgets.WeatherData {
+            city: Plasmoid.configuration.weatherCity
+            fahrenheit: Plasmoid.configuration.weatherFahrenheit
+        }
+    }
+    readonly property var weatherData: weatherLoader.item
+
+    property date now: new Date()
+    Timer {
+        interval: 1000
+        repeat: true
+        running: Plasmoid.configuration.showClock
+        triggeredOnStart: true
+        onTriggered: root.now = new Date()
+    }
 
     // Runs shell commands (power actions)
     P5Support.DataSource {
@@ -138,25 +179,41 @@ PlasmoidItem {
         readonly property int count: taskRepeater.count
         readonly property int offset: cfg.showAppsButton ? 1 : 0
         readonly property int slots: count + offset
-        readonly property real maxZoom: Math.max(1, cfg.maxZoom)
+        // "Blur" style: the blurred background is the Plasma panel itself, so the
+        // panel is only as tall as the bar and icons don't zoom out of it
+        readonly property bool blurStyle: cfg.dockStyle === 4
+        readonly property real maxZoom: blurStyle ? 1 : Math.max(1, cfg.maxZoom)
+        readonly property int bottomGap: blurStyle ? 0 : cfg.bottomMargin
         readonly property real pad: Math.round(cfg.iconSize * 0.18)
-        readonly property real labelSpace: cfg.showLabels ? Kirigami.Units.gridUnit * 2 : 0
+        readonly property real labelSpace: cfg.showLabels && !blurStyle ? Kirigami.Units.gridUnit * 2 : 0
 
         // Resting icon size: the configured one, reduced if the panel is not tall
         // enough for the zoomed icon to fit.
         readonly property real baseIcon: Math.max(16, Math.min(cfg.iconSize,
-            Math.floor((height - cfg.bottomMargin - pad - labelSpace) / maxZoom)))
+            Math.floor((height - bottomGap - pad - labelSpace) / maxZoom)))
         readonly property real spacing: Math.max(0, cfg.iconSpacing)
         readonly property real iconMax: Math.ceil(baseIcon * maxZoom)
 
         readonly property real barHeight: baseIcon + pad * 2
-        readonly property real barY: height - cfg.bottomMargin - barHeight
-        readonly property real restWidth: slots * baseIcon + Math.max(0, slots - 1) * spacing
+        readonly property real barY: height - bottomGap - barHeight
+        // --- widgets (player, weather, clock) after the app icons
+        readonly property real sepGap: Math.max(spacing, 6) * 2 + 1
+        readonly property var widgetWidths: {
+            const w = [];
+            if (cfg.showPlayer) w.push(Math.round(baseIcon * 3.8));
+            if (cfg.showWeather) w.push(Math.round(baseIcon * 2.4));
+            if (cfg.showClock) w.push(Math.round(baseIcon * 2.4));
+            return w;
+        }
+        readonly property real widgetsWidth: widgetWidths.length === 0 ? 0
+            : sepGap + widgetWidths.reduce((a, b) => a + b, 0) + spacing * (widgetWidths.length - 1)
+
+        readonly property real restWidth: slots * baseIcon + Math.max(0, slots - 1) * spacing + widgetsWidth
         readonly property real zoomSlack: (maxZoom - 1) * baseIcon * cfg.zoomRange * 1.15
 
         // Fixed width (with room for the zoom) so the panel does not resize on
         // every mouse move.
-        Layout.minimumWidth: restWidth + pad * 2 + zoomSlack + 8
+        Layout.minimumWidth: restWidth + pad * 2 + zoomSlack + (blurStyle ? 0 : 8)
         Layout.preferredWidth: Layout.minimumWidth
         Layout.maximumWidth: Layout.minimumWidth
         Layout.fillHeight: true
@@ -164,8 +221,10 @@ PlasmoidItem {
         // Panel thickness needed for the configured icon size at full zoom.
         // With "autoPanelHeight" the panel is resized to it, so the icon size
         // setting is not capped by the current panel height.
-        readonly property int neededHeight: Math.ceil(cfg.bottomMargin + pad
-            + cfg.iconSize * maxZoom + labelSpace + 4)
+        readonly property int neededHeight: blurStyle
+            ? Math.ceil(cfg.iconSize + pad * 2)
+            : Math.ceil(cfg.bottomMargin + pad + cfg.iconSize * maxZoom + labelSpace + 4)
+        onBlurStyleChanged: panelResizeTimer.restart()
         onNeededHeightChanged: panelResizeTimer.restart()
         onHeightChanged: panelResizeTimer.restart()
         Timer {
@@ -173,12 +232,13 @@ PlasmoidItem {
             interval: 500
             onTriggered: {
                 if (!dock.cfg.autoPanelHeight || Plasmoid.formFactor !== PlasmaCore.Types.Horizontal
-                        || !Plasmoid.containment || dock.height <= 0
-                        || Math.abs(dock.height - dock.neededHeight) < 2)
+                        || !Plasmoid.containment || dock.height <= 0)
                     return;
+                // Blur: a floating panel gives the bar its gap from the screen edge
                 executable.run("qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
-                    + "'var p = panelById(" + Plasmoid.containment.id + "); if (p) p.height = "
-                    + dock.neededHeight + ";'");
+                    + "'var p = panelById(" + Plasmoid.containment.id + "); if (p) { "
+                    + "if (Math.abs(p.height - " + dock.neededHeight + ") >= 2) p.height = " + dock.neededHeight + "; "
+                    + "if (p.floating !== " + dock.blurStyle + ") p.floating = " + dock.blurStyle + "; }'");
             }
         }
 
@@ -192,6 +252,110 @@ PlasmoidItem {
             : (isDark ? "white" : Qt.rgba(0, 0, 0, 0.75))
 
         // --- drag to reorder
+        // --- window previews on hover
+        property Item previewTask: null   // task whose previews are shown / pending
+        readonly property bool previewOpen: windowPreview.visible
+
+        // windows of a task: one entry per window (children of a group)
+        function windowsOf(task) {
+            const list = [];
+            const add = (idx, row, child) => {
+                const ids = tasksModel.data(idx, TaskManager.AbstractTasksModel.WinIdList) || [];
+                if (ids.length === 0)
+                    return;
+                list.push({
+                    uuid: String(ids[0]),
+                    title: tasksModel.data(idx, Qt.DisplayRole) || "",
+                    icon: tasksModel.data(idx, Qt.DecorationRole),
+                    row: row, child: child
+                });
+            };
+            if (task.model.IsGroupParent) {
+                for (let c = 0; c < task.model.ChildCount; c++)
+                    add(tasksModel.makeModelIndex(task.index, c), task.index, c);
+            } else {
+                add(tasksModel.makeModelIndex(task.index), task.index, -1);
+            }
+            return list;
+        }
+
+        function showPreviewFor(task) {
+            const wins = windowsOf(task);
+            if (wins.length === 0) {
+                hidePreview();
+                return;
+            }
+            previewTask = task;
+            windowPreview.windows = wins;
+            const p = task.mapToGlobal(task.width / 2, 0);
+            windowPreview.anchorX = p.x;
+            windowPreview.anchorTop = dock.mapToGlobal(0, glass.y).y;
+            windowPreview.visible = true;
+            windowPreview.reposition();
+        }
+        function hidePreview() {
+            previewShowTimer.stop();
+            previewHideTimer.stop();
+            windowPreview.visible = false;
+            previewTask = null;
+        }
+        // called by the task icons
+        function previewEnter(task) {
+            if (!cfg.showPreviews || dragging || contextMenuOpen || task.isLauncher)
+                return;
+            previewHideTimer.stop();
+            previewTask = task;
+            if (windowPreview.visible)
+                showPreviewFor(task);       // already open: switch right away
+            else
+                previewShowTimer.restart();
+        }
+        function previewLeave() {
+            previewShowTimer.stop();
+            if (windowPreview.visible)
+                previewHideTimer.restart();
+        }
+
+        Timer {
+            id: previewShowTimer
+            interval: 450
+            onTriggered: if (dock.previewTask) dock.showPreviewFor(dock.previewTask)
+        }
+        Timer {
+            id: previewHideTimer
+            interval: 280
+            onTriggered: {
+                if (windowPreview.hovered)
+                    return;
+                dock.hidePreview();
+            }
+        }
+
+        WindowPreview {
+            id: windowPreview
+            screenGeometry: Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0)
+            thumbWidth: dock.cfg.previewWidth
+            style: dock.cfg.dockStyle
+            backgroundOpacity: dock.cfg.glassOpacity
+            radius: dock.cfg.cornerRadius
+            isDark: dock.isDark
+            accent: dock.accent
+            accentTint: dock.cfg.glassAccentTint
+            showBorder: dock.cfg.showBorder
+            showShadow: dock.cfg.showShadow
+            onHoveredChanged: hovered ? previewHideTimer.stop() : dock.previewLeave()
+            onActivateRequested: (row, child) => {
+                tasksModel.requestActivate(tasksModel.makeModelIndex(row, child));
+                dock.hidePreview();
+            }
+            onCloseRequested: (row, child) => {
+                tasksModel.requestClose(tasksModel.makeModelIndex(row, child));
+                // refresh (or hide when it was the last window)
+                const t = dock.previewTask;
+                Qt.callLater(() => { if (t && windowPreview.visible) dock.showPreviewFor(t); });
+            }
+        }
+
         property Item dragItem: null    // delegate being dragged (identity survives moves)
         property Item droppedItem: null // just released: animates into its slot
         property real dragX: 0          // pointer x (dock coordinates)
@@ -210,7 +374,7 @@ PlasmoidItem {
         // button; returns the clamped pointer x
         function clampDragX(px, w) {
             const lo = (offset === 1 ? layout.xs[0] + layout.sizes[0] + spacing : layout.x0) + w / 2;
-            const hi = layout.x0 + layout.total - w / 2;
+            const hi = layout.iconsEnd - w / 2;
             return Math.max(lo, Math.min(hi, px));
         }
 
@@ -252,139 +416,94 @@ PlasmoidItem {
         readonly property var layout: {
             const n = slots, b = baseIcon, sp = spacing;
             const R = b * cfg.zoomRange;
-            const z = (maxZoom - 1) * zoom;
+            const z = (maxZoom - 1) * zoom;          // 0..maxZoom-1, animated
             const left0 = (width - restWidth) / 2;
-            let sizes = [], total = 0, leftExtra = 0;
+            const center = i => left0 + i * (b + sp) + b / 2;
+            const g = d => d < R ? (Math.cos(Math.PI * d / R) + 1) / 2 : 0;
+            const zoomable = i => !(i === 0 && offset === 1 && !cfg.appsButtonZoom);
+
+            // extra width of each icon for the current pointer position
+            let extras = [], sumE = 0;
             for (let i = 0; i < n; i++) {
-                const restX = left0 + i * (b + sp);
-                const d = Math.abs(mouseX - (restX + b / 2));
-                const g = d < R ? (Math.cos(Math.PI * d / R) + 1) / 2 : 0;
-                const fixed = i === 0 && offset === 1 && !cfg.appsButtonZoom;
-                const s = fixed ? b : b * (1 + z * g);
-                const t = Math.max(0, Math.min(1, (mouseX - restX) / b));
-                leftExtra += (s - b) * t;
-                sizes.push(s);
-                total += s;
+                const e = zoomable(i) ? b * z * g(Math.abs(mouseX - center(i))) : 0;
+                extras.push(e);
+                sumE += e;
             }
-            total += sp * Math.max(0, n - 1);
+
+            // Centered zoom: keep the total extra (= the bar width) the same as
+            // with the pointer in the middle of the icons, so the bar edges don't
+            // "breathe" while the pointer moves along it. Near the ends, where
+            // fewer neighbours are magnified, the magnified ones grow a bit more
+            // to make up the difference ("water-filling"), never beyond the
+            // maximum zoom. (Simulated: width varies < 0.1 px end to end.)
+            if (cfg.centeredZoom && sumE > 0 && n > 1) {
+                const first = zoomable(0) ? 0 : 1;
+                const mid = (center(first) + center(n - 1)) / 2;
+                let target = 0;
+                for (let i = 0; i < n; i++)
+                    if (zoomable(i))
+                        target += b * z * g(Math.abs(mid - center(i)));
+                const cap = b * z;
+                for (let pass = 0; pass < 6; pass++) {
+                    let capped = 0, free = 0;
+                    for (let i = 0; i < n; i++) {
+                        if (extras[i] >= cap - 0.001) capped += extras[i];
+                        else free += extras[i];
+                    }
+                    if (free <= 0 || Math.abs(target - capped - free) < 0.05)
+                        break;
+                    const k = (target - capped) / free;
+                    for (let i = 0; i < n; i++)
+                        if (extras[i] < cap - 0.001)
+                            extras[i] = Math.min(cap, extras[i] * k);
+                }
+                sumE = 0;
+                for (let i = 0; i < n; i++)
+                    sumE += extras[i];
+            }
+
+            let sizes = [], leftExtra = 0;
+            for (let i = 0; i < n; i++) {
+                const s = b + extras[i];
+                const restX = center(i) - b / 2;
+                leftExtra += extras[i] * Math.max(0, Math.min(1, (mouseX - restX) / b));
+                sizes.push(s);
+            }
+            const iconsTotal = n * b + sumE + sp * Math.max(0, n - 1);
+            const total = iconsTotal + widgetsWidth;
             const x0 = cfg.centeredZoom ? (width - total) / 2 : left0 - leftExtra;
             let xs = [], x = x0;
             for (let i = 0; i < n; i++) {
                 xs.push(x);
                 x += sizes[i] + sp;
             }
-            return { sizes: sizes, xs: xs, total: total, x0: x0 };
+            const iconsEnd = x0 + iconsTotal;
+            return { sizes: sizes, xs: xs, total: total, x0: x0,
+                     iconsEnd: iconsEnd, widgetsX: iconsEnd + sepGap };
         }
 
         // ------------------------------------------------------- glass bar
         Item {
             id: glass
-            x: Math.round(dock.layout.x0 - dock.pad)
+            // both edges rounded from the same positions (rounding x and width
+            // separately made the right edge flicker by a pixel)
+            readonly property real leftEdge: Math.round(dock.layout.x0 - dock.pad)
+            readonly property real rightEdge: Math.round(dock.layout.x0 + Math.max(dock.layout.total, dock.baseIcon) + dock.pad)
+            x: dock.blurStyle ? 0 : leftEdge
             y: dock.barY
-            width: Math.round(Math.max(dock.layout.total, dock.baseIcon) + dock.pad * 2)
+            width: dock.blurStyle ? dock.width : rightEdge - leftEdge
             height: dock.barHeight
-            readonly property real r: Math.min(dock.cfg.cornerRadius, height / 2)
 
-            // 0 = Glass, 1 = Frosted, 2 = Clear (no background), 3 = Solid
-            readonly property int style: dock.cfg.dockStyle
-            readonly property bool isGlass: style === 0
-            readonly property bool isFrosted: style === 1
-            readonly property bool hasBody: style !== 2
-            readonly property real bodyAlpha: style === 3 ? 1
-                : style === 1 ? Math.max(0.45, dock.cfg.glassOpacity) : dock.cfg.glassOpacity
-
-            // body + border + shadow
-            Kirigami.ShadowedRectangle {
+            Widgets.GlassSurface {
                 anchors.fill: parent
-                radius: glass.r
-                color: !glass.hasBody ? "transparent"
-                    : glass.style === 3 ? Kirigami.Theme.backgroundColor
-                    : dock.isDark ? Qt.rgba(0.10, 0.10, 0.12, Math.min(1, glass.bodyAlpha + (glass.isGlass ? 0.12 : 0)))
-                    : Qt.rgba(1, 1, 1, glass.bodyAlpha)
-                border.width: dock.cfg.showBorder ? 1 : 0
-                border.color: glass.isFrosted ? Qt.rgba(1, 1, 1, dock.isDark ? 0.12 : 0.35)
-                    : Qt.rgba(1, 1, 1, dock.isDark ? 0.18 : 0.45)
-                shadow.size: dock.cfg.showShadow && glass.hasBody ? 22 : 0
-                shadow.yOffset: 6
-                shadow.color: Qt.rgba(0, 0, 0, dock.isDark ? 0.45 : 0.22)
-            }
-
-            // frosted: milky veil + fine grain
-            Rectangle {
-                visible: glass.isFrosted
-                anchors.fill: parent
-                anchors.margins: 1
-                radius: glass.r - 1
-                color: Qt.rgba(1, 1, 1, dock.isDark ? 0.06 : 0.20)
-            }
-            Kirigami.ShadowedTexture {
-                visible: glass.isFrosted
-                anchors.fill: parent
-                anchors.margins: 1
-                radius: glass.r - 1
-                color: "transparent"
-                opacity: dock.isDark ? 0.55 : 0.8
-                source: Image {
-                    source: Qt.resolvedUrl("../images/noise.png")
-                    fillMode: Image.Stretch
-                    smooth: false
-                    visible: false
-                }
-            }
-
-            // accent tint
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 1
-                radius: glass.r - 1
-                color: dock.accent
-                opacity: dock.cfg.glassAccentTint
-                visible: opacity > 0 && glass.hasBody
-            }
-
-            // vertical sheen (light from above) — glass only
-            Rectangle {
-                visible: glass.isGlass
-                anchors.fill: parent
-                anchors.margins: 1
-                radius: glass.r - 1
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, dock.isDark ? 0.16 : 0.38) }
-                    GradientStop { position: 0.45; color: Qt.rgba(1, 1, 1, dock.isDark ? 0.04 : 0.08) }
-                    GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0) }
-                }
-            }
-
-            // specular highlight on the top edge
-            Rectangle {
-                visible: glass.isGlass
-                anchors.top: parent.top
-                anchors.topMargin: 1
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width - glass.r * 1.4
-                height: 1
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: "transparent" }
-                    GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, dock.isDark ? 0.55 : 0.9) }
-                    GradientStop { position: 1.0; color: "transparent" }
-                }
-            }
-
-            // faint refracted glow on the bottom edge
-            Rectangle {
-                visible: glass.isGlass
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 1
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width - glass.r * 2
-                height: 1
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: "transparent" }
-                    GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.22) }
-                    GradientStop { position: 1.0; color: "transparent" }
-                }
+                style: dock.cfg.dockStyle
+                backgroundOpacity: dock.cfg.glassOpacity
+                radius: dock.cfg.cornerRadius
+                isDark: dock.isDark
+                accent: dock.accent
+                accentTint: dock.cfg.glassAccentTint
+                showBorder: dock.cfg.showBorder
+                showShadow: dock.cfg.showShadow
             }
         }
 
@@ -411,7 +530,7 @@ PlasmoidItem {
             }
 
             Rectangle {
-                opacity: dock.cfg.showLabels && appsMouse.containsMouse ? 1 : 0
+                opacity: dock.cfg.showLabels && !dock.blurStyle && appsMouse.containsMouse ? 1 : 0
                 visible: opacity > 0
                 Behavior on opacity { NumberAnimation { duration: 140 } }
                 width: appsLabel.implicitWidth + Kirigami.Units.largeSpacing * 2
@@ -449,10 +568,18 @@ PlasmoidItem {
         Component.onCompleted: root.dockItem = dock
 
         property double launcherHiddenAt: 0
+        // The launcher (and its app/search models) is created on first use, not at
+        // Plasma startup.
+        readonly property Item launcherView: launcherLoader.item
+
         function toggleLauncher() {
-            // a click on the button first deactivates (hides) the popup;
-            // don't reopen it right away
-            if (launcher.visible || Date.now() - launcherHiddenAt < 250) {
+            if (!launcherLoader.active)
+                launcherLoader.active = true;
+            // a click on the button first deactivates the popup (which starts
+            // closing it); don't reopen it right away
+            if (launcherView.closing || Date.now() - launcherHiddenAt < 250)
+                return;
+            if (launcher.visible) {
                 launcherView.playClose();
                 return;
             }
@@ -469,12 +596,16 @@ PlasmoidItem {
             id: launcher
             type: PlasmaCore.Dialog.AppletPopup
             flags: Qt.WindowStaysOnTopHint
-            // BottomEdge makes KWin's "Sliding popups" effect slide the whole
-            // window (frame + blur) up from the dock
-            location: dock.cfg.launcherAnimation ? PlasmaCore.Types.BottomEdge
-                                                 : PlasmaCore.Types.Floating
-            hideOnWindowDeactivate: true
-            backgroundHints: dock.cfg.launcherCustomBackground ? PlasmaCore.Dialog.NoBackground
+            // With the theme background, BottomEdge lets KWin's "Sliding popups"
+            // effect slide the whole window (frame + blur) up from the dock. The
+            // custom glass background is animated entirely by Launcher.qml.
+            readonly property bool themeBlur: dock.cfg.launcherStyle === 4
+            readonly property bool kwinSlides: dock.cfg.launcherAnimation && themeBlur
+            location: kwinSlides ? PlasmaCore.Types.BottomEdge : PlasmaCore.Types.Floating
+            // closing on deactivation is animated (onActiveChanged) instead
+            hideOnWindowDeactivate: !dock.cfg.launcherAnimation
+            onActiveChanged: if (!active && visible && dock.launcherView) dock.launcherView.playClose()
+            backgroundHints: !themeBlur ? PlasmaCore.Dialog.NoBackground
                                                                : PlasmaCore.Dialog.StandardBackground
             visible: false
 
@@ -490,28 +621,282 @@ PlasmoidItem {
             // centered over the glass bar, cfg.launcherGap px above it
             function reposition() {
                 const p = dock.mapToGlobal(glass.x + glass.width / 2, glass.y);
-                const w = launcherView.width + margins.left + margins.right;
-                const h = launcherView.height + margins.top + margins.bottom;
+                const w = launcherLoader.width + margins.left + margins.right;
+                const h = launcherLoader.height + margins.top + margins.bottom;
                 x = Math.round(p.x - w / 2);
                 y = Math.round(p.y - dock.cfg.launcherGap - h);
             }
 
-            mainItem: Launcher {
-                id: launcherView
+            mainItem: Loader {
+                id: launcherLoader
+                active: false
                 width: dock.cfg.launcherWidth
                 height: dock.cfg.launcherHeight
+                sourceComponent: Launcher {
+                width: launcherLoader.width
+                height: launcherLoader.height
                 appletInterface: root
                 iconSize: dock.cfg.launcherIconSize
-                customBackground: dock.cfg.launcherCustomBackground
+                style: dock.cfg.launcherStyle
+                radius: dock.cfg.cornerRadius + 4
+                accent: dock.accent
+                accentTint: dock.cfg.glassAccentTint
+                showBorder: dock.cfg.showBorder
                 backgroundOpacity: dock.cfg.launcherOpacity
                 isDark: dock.isDark
                 frameMargins: launcher.margins
                 animated: dock.cfg.launcherAnimation
                 animationDuration: dock.cfg.launcherAnimationDuration
+                windowSlides: launcher.kwinSlides
                 onCloseRequested: playClose()
                 onCloseFinished: launcher.visible = false
                 onRunCommand: cmd => executable.run(cmd)
                 onPinRequested: url => tasksModel.requestAddLauncher(url)
+                }
+            }
+        }
+
+        // ------------------------------------------------------------ widgets
+        Rectangle {
+            // separator between apps and widgets
+            visible: dock.widgetsWidth > 0
+            x: Math.round(dock.layout.iconsEnd + dock.sepGap / 2)
+            y: dock.barY + dock.barHeight * 0.2
+            width: 1
+            height: dock.barHeight * 0.6
+            color: Qt.rgba(1, 1, 1, dock.isDark ? 0.18 : 0.5)
+        }
+
+        Row {
+            id: widgetsRow
+            visible: dock.widgetsWidth > 0
+            x: dock.layout.widgetsX
+            y: dock.barY + dock.pad
+            height: dock.baseIcon
+            spacing: dock.spacing
+
+            Widgets.PlayerTile {
+                id: playerTile
+                visible: dock.cfg.showPlayer
+                width: Math.round(dock.baseIcon * 3.8)
+                height: parent.height
+                isDark: dock.isDark
+                player: root.activePlayer
+                active: dock.popupOpenFor(playerTile)
+                onClicked: dock.toggleWidgetPopup(playerTile, playerPopupComponent)
+            }
+            Widgets.WeatherTile {
+                id: weatherTile
+                visible: dock.cfg.showWeather
+                width: Math.round(dock.baseIcon * 2.4)
+                height: parent.height
+                isDark: dock.isDark
+                weather: root.weatherData
+                active: dock.popupOpenFor(weatherTile)
+                onClicked: dock.toggleWidgetPopup(weatherTile, weatherPopupComponent)
+            }
+            Widgets.ClockTile {
+                id: clockTile
+                visible: dock.cfg.showClock
+                width: Math.round(dock.baseIcon * 2.4)
+                height: parent.height
+                isDark: dock.isDark
+                now: root.now
+                active: dock.popupOpenFor(clockTile)
+                onClicked: dock.toggleWidgetPopup(clockTile, clockPopupComponent)
+            }
+        }
+
+        Component { id: playerPopupComponent; Widgets.PlayerPopup { player: root.activePlayer; accent: dock.accent; isDark: dock.isDark } }
+        Component { id: weatherPopupComponent; Widgets.WeatherPopup { weather: root.weatherData; accent: dock.accent; isDark: dock.isDark } }
+        Component { id: clockPopupComponent; Widgets.ClockPopup { now: root.now; accent: dock.accent; isDark: dock.isDark } }
+
+        property double widgetPopupHiddenAt: 0
+        // the tile whose panel is open stays highlighted
+        function popupOpenFor(tile) {
+            return widgetPopup.visible && widgetPopupAnchor === tile && !popupFrame.closing;
+        }
+        property Item widgetPopupAnchor: null
+        function toggleWidgetPopup(anchorItem, component) {
+            const same = widgetPopupAnchor === anchorItem;
+            // clicking the dock deactivates the panel first, which starts closing it
+            if (same && (popupFrame.closing || Date.now() - widgetPopupHiddenAt < 250))
+                return;
+            if (widgetPopup.visible) {
+                if (same) {
+                    popupFrame.playClose();
+                    return;
+                }
+                // another tile: swap the content in place instead of closing/reopening
+                popupFrame.cancelClose();
+                widgetPopupAnchor = anchorItem;
+                widgetPopupLoader.sourceComponent = component;
+                widgetPopup.reposition();
+                popupFrame.playSwitch();
+                widgetPopup.requestActivate();
+                return;
+            }
+            if (launcher.visible)
+                launcherView.playClose();
+            widgetPopupAnchor = anchorItem;
+            widgetPopupLoader.sourceComponent = component;
+            widgetPopup.reposition();
+            widgetPopup.visible = true;
+            widgetPopup.reposition();
+            widgetPopup.requestActivate();
+        }
+
+        PlasmaCore.Dialog {
+            id: widgetPopup
+            type: PlasmaCore.Dialog.AppletPopup
+            flags: Qt.WindowStaysOnTopHint
+            location: PlasmaCore.Types.Floating   // animated by popupFrame instead of KWin
+            // closing on deactivation is animated (onActiveChanged) instead
+            hideOnWindowDeactivate: !dock.cfg.launcherAnimation
+            onActiveChanged: if (!active && visible) popupFrame.playClose()
+            // drawn by GlassSurface so the panels match the dock; Blur style uses
+            // Plasma's own (blurred) background instead
+            readonly property bool themeBlur: dock.cfg.dockStyle === 4
+            backgroundHints: themeBlur ? PlasmaCore.Dialog.StandardBackground : PlasmaCore.Dialog.NoBackground
+            visible: false
+
+            onVisibleChanged: {
+                if (!visible) {
+                    dock.widgetPopupHiddenAt = Date.now();
+                    // destroy the panel content: no timers/bindings left running
+                    // (e.g. the player's position polling) while it is closed
+                    widgetPopupLoader.sourceComponent = undefined;
+                } else
+                    popupFrame.playOpen();
+                Plasmoid.status = visible || launcher.visible ? PlasmaCore.Types.RequiresAttentionStatus
+                                                              : PlasmaCore.Types.ActiveStatus;
+            }
+            onWidthChanged: if (visible) reposition()
+            onHeightChanged: if (visible) reposition()
+
+            // centered over its tile, launcherGap px above the bar
+            function reposition() {
+                if (!dock.widgetPopupAnchor)
+                    return;
+                const a = dock.widgetPopupAnchor;
+                const p = a.mapToGlobal(a.width / 2, 0);
+                const top = dock.mapToGlobal(0, glass.y).y;
+                // the frame has a transparent margin for the shadow (or Plasma's
+                // frame margins in Blur style)
+                const w = popupFrame.width + (themeBlur ? margins.left + margins.right : 0);
+                const h = popupFrame.height + (themeBlur ? margins.top + margins.bottom : 0);
+                x = Math.round(p.x - w / 2);
+                y = Math.round(top - dock.cfg.launcherGap - h + popupFrame.shadowMargin);
+            }
+
+            mainItem: Item {
+                id: popupFrame
+                readonly property int shadowMargin: widgetPopup.themeBlur ? 0 : 28
+                readonly property int padding: Kirigami.Units.gridUnit
+                width: widgetPopupLoader.width + (padding + shadowMargin) * 2
+                height: widgetPopupLoader.height + (padding + shadowMargin) * 2
+
+                // Open: the glass grows out of its tile, the content follows a
+                // moment later. Switch: content cross-fades with a small pop.
+                // Close: quick fade/shrink, then the window is hidden.
+                // Durations follow Plasma's global animation speed.
+                readonly property int dur: Math.round(dock.cfg.launcherAnimationDuration * Kirigami.Units.longDuration / 200)
+                readonly property bool animated: dock.cfg.launcherAnimation && dur >= 10
+                readonly property bool closing: closeAnim.running
+                property real reveal: 1
+
+                function playOpen() {
+                    closeAnim.stop();
+                    if (!animated) {
+                        panel.opacity = 1; panel.scale = 1; rise.y = 0; reveal = 1;
+                        return;
+                    }
+                    panel.opacity = 0; panel.scale = 0.92; rise.y = 14; reveal = 0;
+                    openAnim.restart();
+                }
+                function playSwitch() {
+                    if (!animated)
+                        return;
+                    panel.opacity = 1; rise.y = 0;
+                    panel.scale = 0.97; reveal = 0;
+                    switchAnim.restart();
+                }
+                function playClose() {
+                    if (closeAnim.running)
+                        return;
+                    openAnim.stop();
+                    switchAnim.stop();
+                    if (!animated) {
+                        widgetPopup.visible = false;
+                        return;
+                    }
+                    closeAnim.restart();
+                }
+                function cancelClose() {
+                    if (!closeAnim.running)
+                        return;
+                    closeAnim.stop();
+                    panel.opacity = 1; panel.scale = 1; rise.y = 0; reveal = 1;
+                }
+
+                ParallelAnimation {
+                    id: openAnim
+                    NumberAnimation { target: panel; property: "opacity"; to: 1; duration: popupFrame.dur * 0.8; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: panel; property: "scale"; to: 1; duration: popupFrame.dur; easing.type: Easing.OutBack; easing.overshoot: 1.05 }
+                    NumberAnimation { target: rise; property: "y"; to: 0; duration: popupFrame.dur; easing.type: Easing.OutQuint }
+                    SequentialAnimation {
+                        PauseAnimation { duration: popupFrame.dur * 0.3 }
+                        NumberAnimation { target: popupFrame; property: "reveal"; to: 1; duration: popupFrame.dur; easing.type: Easing.OutCubic }
+                    }
+                }
+                ParallelAnimation {
+                    id: switchAnim
+                    NumberAnimation { target: panel; property: "scale"; to: 1; duration: popupFrame.dur; easing.type: Easing.OutBack; easing.overshoot: 1.05 }
+                    NumberAnimation { target: popupFrame; property: "reveal"; to: 1; duration: popupFrame.dur * 0.9; easing.type: Easing.OutCubic }
+                }
+                SequentialAnimation {
+                    id: closeAnim
+                    ParallelAnimation {
+                        NumberAnimation { target: panel; property: "opacity"; to: 0; duration: popupFrame.dur * 0.55; easing.type: Easing.InCubic }
+                        NumberAnimation { target: panel; property: "scale"; to: 0.95; duration: popupFrame.dur * 0.55; easing.type: Easing.InCubic }
+                        NumberAnimation { target: rise; property: "y"; to: 8; duration: popupFrame.dur * 0.55; easing.type: Easing.InCubic }
+                    }
+                    ScriptAction { script: widgetPopup.visible = false }
+                }
+
+                Item {
+                    id: panel
+                    anchors.fill: parent
+                    anchors.margins: popupFrame.shadowMargin
+                    transformOrigin: Item.Bottom
+                    transform: Translate { id: rise }
+
+                    Widgets.GlassSurface {
+                        anchors.fill: parent
+                        style: dock.cfg.dockStyle
+                        backgroundOpacity: dock.cfg.glassOpacity
+                        radius: dock.cfg.cornerRadius + 4
+                        isDark: dock.isDark
+                        accent: dock.accent
+                        accentTint: dock.cfg.glassAccentTint
+                        showBorder: dock.cfg.showBorder
+                        showShadow: dock.cfg.showShadow
+                        forceBody: true
+                    }
+
+                    Loader {
+                        id: widgetPopupLoader
+                        x: popupFrame.padding
+                        y: popupFrame.padding
+                        width: item ? item.implicitWidth : 1
+                        height: item ? item.implicitHeight : 1
+                        focus: true
+                        Keys.onEscapePressed: popupFrame.playClose()
+                        // staggered reveal of the content
+                        opacity: popupFrame.reveal
+                        transform: Translate { y: (1 - popupFrame.reveal) * 8 }
+                    }
+                }
             }
         }
 
@@ -605,12 +990,18 @@ PlasmoidItem {
                     onTriggered: task.launching = false
                 }
 
-                // bounce (app launching or demanding attention)
+                // bounce (app launching or demanding attention). Both are capped:
+                // a launch bounces for at most ~2.4 s, an attention request three
+                // times, so a stuck flag never keeps the dock repainting forever.
+                readonly property bool startup: model.IsStartup === true
+                readonly property bool attention: model.IsDemandingAttention === true
+                property int attentionLeft: 0
+                onStartupChanged: if (startup) startLaunchBounce()
+                onAttentionChanged: attentionLeft = attention ? 3 : 0
                 SequentialAnimation {
                     loops: Animation.Infinite
                     alwaysRunToEnd: true
-                    running: task.launching || task.model.IsStartup === true
-                             || task.model.IsDemandingAttention === true
+                    running: task.launching || task.attentionLeft > 0
                     NumberAnimation {
                         target: task; property: "bounce"
                         to: dock.baseIcon * 0.5; duration: 280
@@ -620,6 +1011,9 @@ PlasmoidItem {
                         target: task; property: "bounce"
                         to: 0; duration: 420
                         easing.type: Easing.OutBounce
+                    }
+                    ScriptAction {
+                        script: if (task.attentionLeft > 0) task.attentionLeft--
                     }
                 }
 
@@ -701,7 +1095,9 @@ PlasmoidItem {
                 // app name on hover
                 Rectangle {
                     id: label
-                    readonly property bool shown: dock.cfg.showLabels && mouse.containsMouse
+                    // (no room for names above a bar-sized Blur panel)
+                    readonly property bool shown: dock.cfg.showLabels && !dock.blurStyle && mouse.containsMouse
+                                                  && !(dock.previewOpen && dock.previewTask === task)
                                                   && !dock.contextMenuOpen && !dock.dragging
                     opacity: shown ? 1 : 0
                     visible: opacity > 0
@@ -735,12 +1131,15 @@ PlasmoidItem {
                     // over the running-indicator strip)
                     anchors.fill: parent
                     anchors.leftMargin: -(task.slot === 0 ? dock.pad : dock.spacing / 2)
-                    anchors.rightMargin: -(task.slot === dock.slots - 1 ? dock.pad : dock.spacing / 2)
+                    anchors.rightMargin: -(task.slot === dock.slots - 1 && dock.widgetsWidth === 0
+                                           ? dock.pad : dock.spacing / 2)
                     anchors.topMargin: Math.min(0, dock.barY - task.y)
                     anchors.bottomMargin: -(dock.barY + dock.barHeight - task.y - task.height)
                     hoverEnabled: true
                     acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
                     preventStealing: true
+
+                    onContainsMouseChanged: containsMouse ? dock.previewEnter(task) : dock.previewLeave()
 
                     property point pressPos
                     property bool dragActive: false
@@ -757,6 +1156,7 @@ PlasmoidItem {
                         if (!dragActive && Math.abs(m.x - pressPos.x) > Qt.styleHints.startDragDistance) {
                             dragActive = true;
                             dock.dragItem = task;
+                            dock.hidePreview();
                         }
                         if (dragActive) {
                             const p = mapToItem(dock, m.x, m.y);
@@ -784,6 +1184,7 @@ PlasmoidItem {
                             suppressClick = false;
                             return;
                         }
+                        dock.hidePreview();
                         if (mouseEvent.button === Qt.LeftButton) {
                             task.activate();
                         } else if (mouseEvent.button === Qt.MiddleButton) {
