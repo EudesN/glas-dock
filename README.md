@@ -8,6 +8,7 @@ plain QML plasmoids.
 | **Glasdock** (`glasdock/`) | The dock: icon zoom, glass bar, launcher, badges, optional player/weather/clock tiles |
 | **Glasplayer** (`glasplayer/`) | Media player for any panel (e.g. the top bar): cover, title, play/pause, glass panel with controls |
 | **Glasweather** (`glasweather/`) | Weather for any panel: icon and temperature, glass panel with a 5-day forecast |
+| **Glasclock** (`glasclock/`) | Clock and date for any panel, glass panel with the day's events and the month |
 
 All of them share the same glass look and code (`shared/`).
 
@@ -58,6 +59,8 @@ shared/        code used by every widget (glass surface, panels, player/weather 
 glasdock/      the dock
 glasplayer/    panel media player
 glasweather/   panel weather
+glasclock/     panel clock and calendar
+plugin/        blur helper (C++ QML module, built by install.sh)
 install.sh     syncs shared/ into each widget and installs/updates it
 tools/         development helpers
 ```

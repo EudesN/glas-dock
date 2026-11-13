@@ -1,0 +1,20 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "EudesN"
+            }
+        ],
+        "Category": "Date and Time",
+        "Description": "Clock and calendar for the panel with a glass calendar panel, from the Glasdock project",
+        "Icon": "preferences-system-time",
+        "Id": "com.github.eudesn.glasclock",
+        "License": "GPL-2.0+",
+        "Name": "Glasclock",
+        "Version": "0.5.0-alpha.1",
+        "Website": "https://github.com/EudesN/glas-dock",
+        "BugReportUrl": "https://github.com/EudesN/glas-dock/issues"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
