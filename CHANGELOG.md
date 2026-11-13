@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0-alpha.1
+
+- Drag icons to reorder them; the dragged icon stays inside the bar and the
+  new order of pinned apps is saved.
+- Notification badges: a dot for one unread notification, the number for two
+  or more; system accent color by default (red as an option).
+- Dock styles: Glass, Frosted, Clear (no background) and Solid, with optional
+  border and shadow.
+- Dock details (running dots, active-app pill, labels) follow the system
+  accent color; optional accent tint on the glass.
+- Icon hit areas cover the whole bar with no gaps between icons.
+- Launcher: scrollbar beside the app grid, more room after the categories and
+  a tooltip for long app names.
+
 ## 0.3.0-alpha.1
 
 First public alpha.

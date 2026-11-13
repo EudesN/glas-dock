@@ -14,6 +14,11 @@ A macOS-style dock for KDE Plasma 6, written as a plain QML plasmoid.
 - **Animations** — icons bounce while an app launches or asks for attention.
 - **Task manager** — pinned apps, running indicators, cycling between windows of
   the same app, middle-click for a new window, context menu.
+- **Reorder by dragging** — drag icons along the dock to change their order.
+- **Notification badges** — a dot or the number of unread notifications on
+  each app, in the system accent color.
+- **Styles** — Glass, Frosted, Clear or Solid, with optional border, shadow
+  and accent tint; details follow the system accent color.
 - **App launcher** — opens centered above the dock (apps button, Meta or
   Alt+F1): favorites, categories, search and power actions.
 - **Configurable** — icon size, spacing, zoom, glass opacity, corner radius,
@@ -41,7 +46,9 @@ systemctl --user restart plasma-plasmashell
 
 - The launcher's custom glass background cannot blur the desktop behind it
   (QML has no API for KWin blur). The theme background keeps the blur.
-- Icons cannot be reordered by dragging yet.
+- Badges count unread notifications only; app-provided counters (Unity
+  LauncherEntry, used by Telegram/Discord) are not read yet.
+- No real blur behind the dock (QML has no API for KWin blur).
 - Horizontal panels only.
 
 ## License
