@@ -31,7 +31,10 @@ PlasmaCore.Dialog {
     property bool animated: true
     property int animationDuration: 220
 
-    readonly property bool closing: closeAnim.running
+    readonly property bool closing: closeAnim.running || morphClose.running
+    // EXPERIMENTAL: the panel grows out of the widget's own rectangle (and
+    // shrinks back into it when closing) instead of fading in next to it
+    property bool morph: false
     property bool blurBehind: false     // real blur behind the glass (plugin)
     property real frost: 0
     property double hiddenAt: 0
@@ -58,9 +61,14 @@ PlasmaCore.Dialog {
     }
 
     function close() {
-        if (closeAnim.running || !visible)
+        if (closeAnim.running || morphClose.running || !visible)
             return;
         openAnim.stop();
+        morphOpen.stop();
+        if (morph && frame.animatedNow) {
+            morphClose.restart();
+            return;
+        }
         if (!frame.animatedNow) {
             visible = false;
             return;
@@ -86,6 +94,12 @@ PlasmaCore.Dialog {
         const w = frame.width, h = frame.height;
         const m = frame.shadowMargin;
         let nx = Math.round(p.x + anchorItem.width / 2 - w / 2);
+        let ny = fromTop ? Math.round(p.y + anchorItem.height + gap - m)
+                         : Math.round(p.y - gap - h + m);
+        if (morph) {
+            // the window also covers the widget, so the panel can start from it
+            ny = fromTop ? Math.round(p.y - m) : Math.round(p.y + anchorItem.height - h + m);
+        }
         const g = screenGeometry;
         if (g.width > 0) {
             // the frame has a transparent shadow margin m on each side
@@ -94,8 +108,9 @@ PlasmaCore.Dialog {
             nx = Math.max(left, Math.min(right - w, nx));
         }
         x = nx;
-        y = fromTop ? Math.round(p.y + anchorItem.height + gap - m)
-                    : Math.round(p.y - gap - h + m);
+        y = ny;
+        // the widget's rectangle in window coordinates (morph start)
+        frame.anchorRect = Qt.rect(p.x - nx, p.y - ny, anchorItem.width, anchorItem.height);
     }
 
     mainItem: Item {
@@ -106,11 +121,31 @@ PlasmaCore.Dialog {
         readonly property bool animatedNow: popup.animated && dur >= 10
         property real reveal: 1
 
+        // morph: room for the widget's own rectangle on the panel side
+        readonly property real extra: popup.morph && popup.anchorItem ? popup.anchorItem.height + popup.gap : 0
+        property rect anchorRect: Qt.rect(0, 0, 0, 0)
+        property real t: 1        // 0 = widget rectangle, 1 = full panel
+        // full panel rectangle
+        readonly property real fx: shadowMargin
+        readonly property real fy: shadowMargin + (popup.fromTop ? extra : 0)
+        readonly property real fw: width - shadowMargin * 2
+        readonly property real fh: height - shadowMargin * 2 - extra
+
         width: Math.max(1, loader.width) + (padding + shadowMargin) * 2
-        height: Math.max(1, loader.height) + (padding + shadowMargin) * 2
+        height: Math.max(1, loader.height) + (padding + shadowMargin) * 2 + extra
 
         function playOpen() {
             closeAnim.stop();
+            morphClose.stop();
+            if (popup.morph && animatedNow) {
+                popup.reposition();
+                panel.opacity = 1; panel.scale = 1; shift.y = 0;
+                reveal = 0;
+                t = 0;
+                morphOpen.restart();
+                return;
+            }
+            t = 1;
             if (!animatedNow) {
                 panel.opacity = 1; panel.scale = 1; shift.y = 0; reveal = 1;
                 return;
@@ -133,6 +168,40 @@ PlasmaCore.Dialog {
             }
         }
 
+        // morph open: the glass grows from the widget's rectangle, then the
+        // content fades in
+        ParallelAnimation {
+            id: morphOpen
+            NumberAnimation { target: frame; property: "t"; to: 1; duration: frame.dur * 1.4; easing.type: Easing.OutQuint }
+            SequentialAnimation {
+                PauseAnimation { duration: frame.dur * 0.6 }
+                NumberAnimation { target: frame; property: "reveal"; to: 1; duration: frame.dur * 0.8; easing.type: Easing.OutCubic }
+            }
+        }
+        // morph close: content out, glass shrinks back into the widget
+        SequentialAnimation {
+            id: morphClose
+            NumberAnimation { target: frame; property: "reveal"; to: 0; duration: frame.dur * 0.35; easing.type: Easing.InCubic }
+            ParallelAnimation {
+                NumberAnimation { target: frame; property: "t"; to: 0; duration: frame.dur; easing.type: Easing.InOutCubic }
+                SequentialAnimation {
+                    PauseAnimation { duration: frame.dur * 0.6 }
+                    NumberAnimation { target: panel; property: "opacity"; to: 0; duration: frame.dur * 0.4 }
+                }
+            }
+            ScriptAction { script: popup.visible = false }
+        }
+
+        // a click on the widget's area (covered by this window in morph mode) closes
+        MouseArea {
+            visible: popup.morph
+            x: frame.anchorRect.x
+            y: frame.anchorRect.y
+            width: frame.anchorRect.width
+            height: frame.anchorRect.height
+            onClicked: popup.close()
+        }
+
         SequentialAnimation {
             id: closeAnim
             ParallelAnimation {
@@ -145,8 +214,12 @@ PlasmaCore.Dialog {
 
         Item {
             id: panel
-            anchors.fill: parent
-            anchors.margins: frame.shadowMargin
+            // between the widget's rectangle (t = 0) and the full panel (t = 1)
+            x: frame.anchorRect.x + (frame.fx - frame.anchorRect.x) * frame.t
+            y: frame.anchorRect.y + (frame.fy - frame.anchorRect.y) * frame.t
+            width: frame.anchorRect.width + (frame.fw - frame.anchorRect.width) * frame.t
+            height: frame.anchorRect.height + (frame.fh - frame.anchorRect.height) * frame.t
+            clip: frame.t < 1
             // grows out of the panel the widget sits on
             transformOrigin: popup.fromTop ? Item.Top : Item.Bottom
             transform: Translate { id: shift }
@@ -155,7 +228,10 @@ PlasmaCore.Dialog {
                 anchors.fill: parent
                 style: popup.style
                 backgroundOpacity: popup.backgroundOpacity
-                radius: popup.radius
+                // pill-shaped like the widget at the start of a morph
+                radius: frame.t < 1 ? Math.min(popup.radius, frame.anchorRect.height / 2)
+                                      + (popup.radius - Math.min(popup.radius, frame.anchorRect.height / 2)) * frame.t
+                                    : popup.radius
                 isDark: popup.isDark
                 accent: popup.accent
                 forceBody: true
@@ -165,8 +241,9 @@ PlasmaCore.Dialog {
 
             Loader {
                 id: loader
-                x: frame.padding
-                y: frame.padding
+                // stays where it is in the full panel while the glass morphs
+                x: frame.padding + frame.fx - panel.x
+                y: frame.padding + frame.fy - panel.y
                 active: popup.visible
                 width: item ? item.implicitWidth : 0
                 height: item ? item.implicitHeight : 0

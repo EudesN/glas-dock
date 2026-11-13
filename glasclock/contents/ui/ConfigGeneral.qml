@@ -21,6 +21,7 @@ KCM.SimpleKCM {
     property alias cfg_popupRadius: popupRadius.value
     property alias cfg_popupAnimation: popupAnimation.checked
     property alias cfg_popupGap: popupGap.value
+    property alias cfg_popupMorph: popupMorph.checked
 
     Kirigami.FormLayout {
         Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Clock" }
@@ -101,6 +102,11 @@ KCM.SimpleKCM {
             valueFromText: t => parseInt(t)
         }
         QQC2.CheckBox { id: popupAnimation; text: "Animate opening and closing" }
+        QQC2.CheckBox {
+            id: popupMorph
+            enabled: popupAnimation.checked
+            text: "Grow out of the widget (experimental)"
+        }
 
         // ---- real blur (org.glasdock.blur helper plugin)
         Kirigami.Separator {
