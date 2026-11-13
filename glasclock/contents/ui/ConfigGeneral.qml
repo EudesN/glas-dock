@@ -4,14 +4,45 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
 import org.kde.plasma.workspace.calendar as PlasmaCalendar
+import org.kde.kholidays as KHolidays
 import org.kde.plasma.plasma5support as P5Support
 
 KCM.SimpleKCM {
+    id: page
     property alias cfg_timeFormat: timeFormat.currentIndex
     property alias cfg_showDate: showDate.checked
     property alias cfg_showSeconds: showSeconds.checked
     property alias cfg_twoLines: twoLines.checked
     property var cfg_calendarPlugins: []
+    property string cfg_holidayRegion: "auto"
+
+    // holiday regions for the combo box: "auto" first, then all KHolidays
+    // regions sorted by country name
+    property var regionItems: [{ code: "auto", label: "Automatic (country of the system time zone)" }]
+    KHolidays.HolidayRegionsModel { id: regionsModel }
+    Instantiator {
+        id: regionList
+        model: regionsModel
+        delegate: QtObject {
+            required property string region
+            required property string name
+        }
+        onObjectAdded: regionTimer.restart()
+    }
+    Timer {
+        id: regionTimer
+        interval: 50
+        onTriggered: {
+            const items = [];
+            for (let i = 0; i < regionList.count; i++) {
+                const o = regionList.objectAt(i);
+                if (o && o.region)
+                    items.push({ code: o.region, label: o.name + "  ·  " + o.region });
+            }
+            items.sort((a, b) => a.label.localeCompare(b.label));
+            page.regionItems = [{ code: "auto", label: "Automatic (country of the system time zone)" }].concat(items);
+        }
+    }
     property alias cfg_pillBackground: pillBackground.checked
     // style 4 (the old "Blur" style) shows as Glass with blur on
     property int cfg_popupStyle
@@ -56,12 +87,21 @@ KCM.SimpleKCM {
                 }
             }
         }
+        QQC2.ComboBox {
+            id: holidayRegion
+            Kirigami.FormData.label: "Holidays of:"
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 18
+            model: page.regionItems
+            textRole: "label"
+            currentIndex: Math.max(0, page.regionItems.findIndex(r => r.code === cfg_holidayRegion))
+            onActivated: index => cfg_holidayRegion = page.regionItems[index].code
+        }
         QQC2.Label {
             Layout.maximumWidth: Kirigami.Units.gridUnit * 22
             wrapMode: Text.WordWrap
             font: Kirigami.Theme.smallFont
             opacity: 0.7
-            text: "Holidays and their region are configured in the Digital Clock settings. Personal calendars (KOrganizer / Merkuro) appear here when the KDE PIM events plugin (kdepim-addons) is installed."
+            text: "Automatic sets your country's holidays (from the system time zone) when no region is set yet. The region is shared with Plasma's Digital Clock. Personal calendars (KOrganizer / Merkuro) appear when the KDE PIM events plugin (kdepim-addons) is installed."
         }
         PlasmaCalendar.EventPluginsManager { id: pluginsManager }
 

@@ -10,6 +10,8 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PC3
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.workspace.calendar as PlasmaCalendar
+import org.kde.plasma.plasma5support as P5Support
+import org.kde.kholidays as KHolidays
 import "shared" as Shared
 
 PlasmoidItem {
@@ -45,7 +47,107 @@ PlasmoidItem {
     // settings list)
     PlasmaCalendar.EventPluginsManager {
         id: eventPlugins
-        enabledPlugins: root.cfg.calendarPlugins
+        Component.onCompleted: enabledPlugins = root.cfg.calendarPlugins
+    }
+    function reloadEventPlugins() {
+        eventPlugins.enabledPlugins = [];
+        Qt.callLater(() => eventPlugins.enabledPlugins = root.cfg.calendarPlugins);
+    }
+    Connections {
+        target: Plasmoid.configuration
+        function onValueChanged(key, value) {
+            if (key === "calendarPlugins")
+                root.reloadEventPlugins();
+            if (key === "holidayRegion")
+                root.applyHolidayRegion();
+        }
+    }
+
+    // ---- holidays of the user's country
+    // Plasma's holidays plugin uses the region stored in
+    // plasma_calendar_holiday_regions [General] selectedRegions (shared with
+    // the Digital Clock). "auto": detect the country from the system time
+    // zone and set its region only when none is configured yet; a region
+    // chosen in the settings always replaces it.
+    property string countryCode: ""          // e.g. "BR"
+    property string pluginRegions: "?"       // current selectedRegions ("?" = not read yet)
+    property var regionCodes: []             // all KHolidays region codes
+    readonly property string autoRegion: regionForCountry(countryCode)
+
+    KHolidays.HolidayRegionsModel { id: holidayRegions }
+    Instantiator {
+        id: regionInst
+        model: holidayRegions
+        delegate: QtObject { required property string region }
+        onObjectAdded: (i, obj) => regionTimer.restart()
+    }
+    Timer {
+        id: regionTimer
+        interval: 50
+        onTriggered: {
+            const codes = [];
+            for (let i = 0; i < regionInst.count; i++) {
+                const o = regionInst.objectAt(i);
+                if (o && o.region)
+                    codes.push(o.region);
+            }
+            root.regionCodes = codes;
+            root.applyHolidayRegion();
+        }
+    }
+
+    // national region of a country: "br" -> "br_pt-br"; prefers the
+    // locale's language when a country has several (e.g. "ca_en"/"ca_fr")
+    function regionForCountry(cc) {
+        if (!cc)
+            return "";
+        const lang = Qt.locale().name.split("_")[0];
+        const national = regionCodes.filter(c => c.split("_")[0] === cc.toLowerCase());
+        return national.find(c => c.split("_")[1] && c.split("_")[1].indexOf(lang) === 0) || national[0] || "";
+    }
+
+    function applyHolidayRegion() {
+        if (pluginRegions === "?")
+            return;
+        const manual = cfg.holidayRegion && cfg.holidayRegion !== "auto";
+        const wanted = manual ? cfg.holidayRegion : autoRegion;
+        if (!wanted)
+            return;
+        if (manual ? pluginRegions === wanted : pluginRegions !== "")
+            return;
+        shell.run("write", "kwriteconfig6 --file plasma_calendar_holiday_regions --group General --key selectedRegions " + wanted);
+        pluginRegions = wanted;
+    }
+
+    P5Support.DataSource {
+        id: shell
+        engine: "executable"
+        connectedSources: []
+        property var tags: ({})
+        function run(tag, cmd) {
+            tags[cmd] = tag;
+            connectSource(cmd);
+        }
+        onNewData: (source, data) => {
+            const out = (data["stdout"] || "").trim();
+            const tag = tags[source];
+            disconnectSource(source);
+            if (tag === "country") {
+                root.countryCode = out;
+                root.applyHolidayRegion();
+            } else if (tag === "read") {
+                root.pluginRegions = out;
+                root.applyHolidayRegion();
+            } else if (tag === "write") {
+                root.reloadEventPlugins();
+            }
+        }
+    }
+    Component.onCompleted: {
+        // time zone (also old aliases like Brazil/East) -> canonical zone -> ISO country
+        const script = Qt.resolvedUrl("../code/country.sh").toString().replace("file://", "");
+        shell.run("country", "sh '" + script + "'");
+        shell.run("read", "kreadconfig6 --file plasma_calendar_holiday_regions --group General --key selectedRegions");
     }
 
     readonly property bool isDark: Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.backgroundColor) === Kirigami.ColorUtils.Dark
