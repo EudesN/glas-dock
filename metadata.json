@@ -1,0 +1,24 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "EudesN"
+            }
+        ],
+        "Category": "Windows and Tasks",
+        "Description": "macOS-style dock with icon zoom, glass background and app launcher",
+        "Icon": "preferences-system-windows",
+        "Id": "com.github.eudesn.glasdock",
+        "License": "GPL-2.0+",
+        "Name": "Glasdock",
+        "Version": "0.3.0-alpha.1",
+        "Website": "https://github.com/EudesN/glas-dock",
+        "BugReportUrl": "https://github.com/EudesN/glas-dock/issues"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-Provides": [
+        "org.kde.plasma.multitasking",
+        "org.kde.plasma.launchermenu"
+    ]
+}
