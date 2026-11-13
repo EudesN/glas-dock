@@ -10,6 +10,7 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import org.kde.taskmanager as TaskManager
 import org.kde.plasma.plasma5support as P5Support
+import org.kde.notificationmanager as NotificationManager
 
 PlasmoidItem {
     id: root
@@ -55,6 +56,58 @@ PlasmoidItem {
               && Plasmoid.formFactor === PlasmaCore.Types.Horizontal
         restoreMode: Binding.RestoreBindingOrValue
     }
+
+    // ------------------------------------------------------- notification badges
+    // Count of unread notifications in Plasma's notification history, per app
+    // (desktop entry). Cleared when the notifications are read in the history.
+    property var notifCounts: ({})
+
+    // "applications:org.telegram.desktop.desktop", "file:///…/x.desktop",
+    // "/usr/share/applications/x.desktop", "firefox" -> lowercase id without .desktop
+    function appKey(s) {
+        if (!s)
+            return "";
+        s = s.toString().replace(/^application:\/\//, "").replace(/^applications:/, "");
+        s = s.substring(s.lastIndexOf("/") + 1).replace(/\.desktop$/, "");
+        return s.toLowerCase();
+    }
+
+    function badgeFor(appId, launcherUrl) {
+        const a = appKey(appId), b = appKey(launcherUrl);
+        return Math.max(notifCounts[a] || 0, notifCounts[b] || 0);
+    }
+
+    NotificationManager.Notifications {
+        id: notifModel
+        showNotifications: true
+        showJobs: false
+        showExpired: true
+        showDismissed: false
+        groupMode: NotificationManager.Notifications.GroupDisabled
+    }
+    Connections {
+        target: notifModel
+        function onCountChanged() { recountTimer.restart(); }
+        function onDataChanged() { recountTimer.restart(); }
+        function onModelReset() { recountTimer.restart(); }
+    }
+    Timer {
+        id: recountTimer
+        interval: 150
+        onTriggered: {
+            const counts = {};
+            for (let i = 0; i < notifModel.count; i++) {
+                const idx = notifModel.index(i, 0);
+                if (notifModel.data(idx, NotificationManager.Notifications.ReadRole))
+                    continue;
+                const k = root.appKey(notifModel.data(idx, NotificationManager.Notifications.DesktopEntryRole));
+                if (k)
+                    counts[k] = (counts[k] || 0) + 1;
+            }
+            root.notifCounts = counts;
+        }
+    }
+    Component.onCompleted: recountTimer.start()
 
     // Runs shell commands (power actions)
     P5Support.DataSource {
@@ -232,17 +285,51 @@ PlasmoidItem {
             height: dock.barHeight
             readonly property real r: Math.min(dock.cfg.cornerRadius, height / 2)
 
-            // translucent body + border + shadow
+            // 0 = Glass, 1 = Frosted, 2 = Clear (no background), 3 = Solid
+            readonly property int style: dock.cfg.dockStyle
+            readonly property bool isGlass: style === 0
+            readonly property bool isFrosted: style === 1
+            readonly property bool hasBody: style !== 2
+            readonly property real bodyAlpha: style === 3 ? 1
+                : style === 1 ? Math.max(0.45, dock.cfg.glassOpacity) : dock.cfg.glassOpacity
+
+            // body + border + shadow
             Kirigami.ShadowedRectangle {
                 anchors.fill: parent
                 radius: glass.r
-                color: dock.isDark ? Qt.rgba(0.10, 0.10, 0.12, dock.cfg.glassOpacity + 0.12)
-                                   : Qt.rgba(1, 1, 1, dock.cfg.glassOpacity)
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, dock.isDark ? 0.18 : 0.45)
-                shadow.size: 22
+                color: !glass.hasBody ? "transparent"
+                    : glass.style === 3 ? Kirigami.Theme.backgroundColor
+                    : dock.isDark ? Qt.rgba(0.10, 0.10, 0.12, Math.min(1, glass.bodyAlpha + (glass.isGlass ? 0.12 : 0)))
+                    : Qt.rgba(1, 1, 1, glass.bodyAlpha)
+                border.width: dock.cfg.showBorder ? 1 : 0
+                border.color: glass.isFrosted ? Qt.rgba(1, 1, 1, dock.isDark ? 0.12 : 0.35)
+                    : Qt.rgba(1, 1, 1, dock.isDark ? 0.18 : 0.45)
+                shadow.size: dock.cfg.showShadow && glass.hasBody ? 22 : 0
                 shadow.yOffset: 6
                 shadow.color: Qt.rgba(0, 0, 0, dock.isDark ? 0.45 : 0.22)
+            }
+
+            // frosted: milky veil + fine grain
+            Rectangle {
+                visible: glass.isFrosted
+                anchors.fill: parent
+                anchors.margins: 1
+                radius: glass.r - 1
+                color: Qt.rgba(1, 1, 1, dock.isDark ? 0.06 : 0.20)
+            }
+            Kirigami.ShadowedTexture {
+                visible: glass.isFrosted
+                anchors.fill: parent
+                anchors.margins: 1
+                radius: glass.r - 1
+                color: "transparent"
+                opacity: dock.isDark ? 0.55 : 0.8
+                source: Image {
+                    source: Qt.resolvedUrl("../images/noise.png")
+                    fillMode: Image.Stretch
+                    smooth: false
+                    visible: false
+                }
             }
 
             // accent tint
@@ -252,11 +339,12 @@ PlasmoidItem {
                 radius: glass.r - 1
                 color: dock.accent
                 opacity: dock.cfg.glassAccentTint
-                visible: opacity > 0
+                visible: opacity > 0 && glass.hasBody
             }
 
-            // vertical sheen (light from above)
+            // vertical sheen (light from above) — glass only
             Rectangle {
+                visible: glass.isGlass
                 anchors.fill: parent
                 anchors.margins: 1
                 radius: glass.r - 1
@@ -269,6 +357,7 @@ PlasmoidItem {
 
             // specular highlight on the top edge
             Rectangle {
+                visible: glass.isGlass
                 anchors.top: parent.top
                 anchors.topMargin: 1
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -284,6 +373,7 @@ PlasmoidItem {
 
             // faint refracted glow on the bottom edge
             Rectangle {
+                visible: glass.isGlass
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 1
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -443,6 +533,7 @@ PlasmoidItem {
                 visible: laidOut
                 readonly property real size: dock.layout.sizes[slot] ?? dock.baseIcon
                 readonly property bool isLauncher: model.IsLauncher === true
+                readonly property int badgeCount: root.badgeFor(model.AppId, model.LauncherUrlWithoutIcon)
                 property real bounce: 0
                 property bool launching: false
 
@@ -544,6 +635,34 @@ PlasmoidItem {
                     source: task.model.decoration
                     opacity: mouse.pressed ? 0.65 : 1
                     Behavior on opacity { NumberAnimation { duration: 90 } }
+                }
+
+                // notification badge (top-right of the icon)
+                Rectangle {
+                    id: badge
+                    readonly property bool shown: dock.cfg.showBadges && task.badgeCount > 0 && !task.dragged
+                    readonly property real h: Math.max(14, Math.round(task.size * 0.34))
+                    height: h
+                    width: Math.max(h, badgeText.implicitWidth + h * 0.55)
+                    radius: h / 2
+                    x: task.width - width * 0.8
+                    y: -h * 0.15
+                    z: 5
+                    color: dock.cfg.badgeUseAccent ? dock.accent : "#ff3b30"
+                    border.width: 1
+                    border.color: Qt.rgba(0, 0, 0, 0.18)
+                    scale: shown ? 1 : 0
+                    visible: scale > 0
+                    Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack } }
+
+                    Text {
+                        id: badgeText
+                        anchors.centerIn: parent
+                        text: task.badgeCount > 99 ? "99+" : task.badgeCount
+                        color: "white"
+                        font.pixelSize: Math.round(badge.h * 0.62)
+                        font.bold: true
+                    }
                 }
 
                 // running indicator
