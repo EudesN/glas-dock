@@ -10,12 +10,15 @@
  */
 import QtQuick
 import org.kde.plasma.private.mpris as Mpris
+import org.kde.taskmanager as TaskManager
 
 Item {
     id: source
 
     property var rawPlayer: null
     readonly property var player: rawPlayer ? playerProxy : null
+    property int matchedTaskRow: -1
+    property string matchedTaskAppId: ""
 
     // Spotify Desktop on Linux leaves xesam:title, xesam:artist and mpris:artUrl
     // empty when playing on a remote Spotify Connect device (e.g. a phone), and
@@ -159,7 +162,14 @@ Item {
         readonly property string album: source.rawPlayer ? (source.rawPlayer.album || "") : ""
         readonly property string artUrl: source.isSpotifyTrackId ? source.resolvedArtUrl : source.rawArtUrl
         readonly property string identity: source.rawPlayer ? (source.rawPlayer.identity || "") : ""
-        readonly property string iconName: source.rawPlayer ? (source.rawPlayer.iconName || "") : ""
+        readonly property string iconName: {
+            if (!source.rawPlayer)
+                return "";
+            const icon = source.rawPlayer.iconName || "";
+            if (icon && icon !== "emblem-music-symbolic")
+                return icon;
+            return source.matchedTaskAppId || source.rawPlayer.desktopEntry || icon;
+        }
         readonly property int playbackStatus: source.rawPlayer ? source.rawPlayer.playbackStatus : 0
         readonly property real position: source.rawPlayer ? source.rawPlayer.position : 0
         readonly property real length: source.rawPlayer ? source.rawPlayer.length : 0
@@ -168,17 +178,92 @@ Item {
         readonly property bool canGoNext: source.rawPlayer ? source.rawPlayer.canGoNext : false
         readonly property bool canPlay: source.rawPlayer ? source.rawPlayer.canPlay : false
         readonly property bool canPause: source.rawPlayer ? source.rawPlayer.canPause : false
-        readonly property bool canRaise: source.rawPlayer ? source.rawPlayer.canRaise : false
+        readonly property bool canRaise: source.rawPlayer
+            ? (source.rawPlayer.canRaise || source.matchedTaskRow >= 0)
+            : false
 
         function seekTo(pos) { if (source.rawPlayer) source.rawPlayer.position = pos; }
         function playPause() { if (source.rawPlayer) source.rawPlayer.PlayPause(); }
         function previous() { if (source.rawPlayer) source.rawPlayer.Previous(); }
         function next() { if (source.rawPlayer) source.rawPlayer.Next(); }
-        function raise() { if (source.rawPlayer) source.rawPlayer.Raise(); }
+        function raise() {
+            if (!source.rawPlayer)
+                return;
+            if (source.rawPlayer.canRaise)
+                source.rawPlayer.Raise();
+            const row = source._findTaskRow(source.rawPlayer);
+            if (row >= 0)
+                tasksModel.requestActivate(tasksModel.index(row, 0));
+        }
         function updatePosition() { if (source.rawPlayer) source.rawPlayer.updatePosition(); }
     }
 
     Mpris.Mpris2Model { id: mprisModel }
+    TaskManager.TasksModel {
+        id: tasksModel
+        groupMode: TaskManager.TasksModel.GroupDisabled
+    }
+
+    Connections {
+        target: tasksModel
+        function onRowsInserted() { taskSyncTimer.restart(); }
+        function onRowsRemoved() { taskSyncTimer.restart(); }
+        function onModelReset() { taskSyncTimer.restart(); }
+        function onDataChanged() { taskSyncTimer.restart(); }
+    }
+    Timer {
+        id: taskSyncTimer
+        interval: 80
+        onTriggered: source._updateMatchedTask()
+    }
+    onRawPlayerChanged: _updateMatchedTask()
+
+    function _findTaskRow(raw) {
+        if (!raw)
+            return -1;
+        const kdePid = raw.kdePid || 0;
+        const instPid = raw.instancePid || 0;
+        const de = (raw.desktopEntry || "").replace(/\.desktop$/i, "").toLowerCase();
+        const id = (raw.identity || "").toLowerCase();
+        let byDe = -1;
+        let byId = -1;
+        const count = tasksModel.rowCount();
+        for (let i = 0; i < count; i++) {
+            const idx = tasksModel.index(i, 0);
+            if (tasksModel.data(idx, TaskManager.AbstractTasksModel.IsWindow) !== true)
+                continue;
+            const tPid = tasksModel.data(idx, TaskManager.AbstractTasksModel.AppPid) || 0;
+            if ((kdePid > 0 && tPid === kdePid) || (instPid > 0 && tPid === instPid))
+                return i;
+            const appId = (tasksModel.data(idx, TaskManager.AbstractTasksModel.AppId) || "").toLowerCase();
+            const appName = (tasksModel.data(idx, TaskManager.AbstractTasksModel.AppName) || "").toLowerCase();
+            const launcher = (tasksModel.data(idx, TaskManager.AbstractTasksModel.LauncherUrlWithoutIcon) || "").toString().toLowerCase();
+            if (byDe === -1 && de.length > 0) {
+                if (appId === de
+                        || appId.endsWith("." + de)
+                        || appId.indexOf("." + de + ".") !== -1
+                        || launcher.endsWith("/" + de + ".desktop")) {
+                    byDe = i;
+                }
+            }
+            if (byId === -1 && id.length > 0) {
+                if (appName === id || appId === id || appId.indexOf(id) !== -1)
+                    byId = i;
+            }
+        }
+        return byDe !== -1 ? byDe : byId;
+    }
+
+    function _updateMatchedTask() {
+        const row = _findTaskRow(rawPlayer);
+        matchedTaskRow = row;
+        if (row >= 0) {
+            const idx = tasksModel.index(row, 0);
+            matchedTaskAppId = tasksModel.data(idx, TaskManager.AbstractTasksModel.AppId) || "";
+        } else {
+            matchedTaskAppId = "";
+        }
+    }
 
     Instantiator {
         id: rows

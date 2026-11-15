@@ -23,7 +23,7 @@ Rectangle {
     border.width: 1
     border.color: active ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g,
                                    Kirigami.Theme.highlightColor.b, 0.65)
-                         : Qt.rgba(1, 1, 1, isDark ? (hovered ? 0.18 : 0.11) : 0.48)
+                         : isDark ? Qt.rgba(1, 1, 1, hovered ? 0.18 : 0.11) : Qt.rgba(0, 0, 0, 0.08)
     Behavior on border.color { ColorAnimation { duration: 120 } }
     Behavior on color { ColorAnimation { duration: 120 } }
 

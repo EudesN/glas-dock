@@ -9,6 +9,7 @@ import org.kde.plasma.plasma5support as P5Support
 KCM.SimpleKCM {
     // style 4 (the old "Blur" style) shows as Glass with blur on
     property int cfg_dockStyle
+    property alias cfg_themeMode: themeMode.currentIndex
     property bool cfg_blurBehind
     property alias cfg_blurFrost: blurFrost.value
     property alias cfg_glassOpacity: glassOpacity.value
@@ -38,6 +39,11 @@ KCM.SimpleKCM {
                     cfg_blurBehind = true;
                 cfg_dockStyle = index;
             }
+        }
+        QQC2.ComboBox {
+            id: themeMode
+            Kirigami.FormData.label: "Theme:"
+            model: ["Follow system", "Dark", "Light"]
         }
         RowLayout {
             Kirigami.FormData.label: "Opacity:"

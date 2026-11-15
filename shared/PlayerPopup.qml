@@ -17,6 +17,8 @@ Item {
     readonly property bool playing: hasPlayer && player.playbackStatus === Mpris.PlaybackStatus.Playing
     readonly property real progress: hasPlayer && player.length > 0 ? Math.min(1, player.position / player.length) : 0
 
+    signal closeRequested()
+
     implicitWidth: Kirigami.Units.gridUnit * 22
     implicitHeight: layout.implicitHeight
 
@@ -180,7 +182,10 @@ Item {
             text: popup.hasPlayer ? "Open " + popup.player.identity : ""
             iconSize: Kirigami.Units.iconSizes.small
             isDark: popup.isDark
-            onClicked: popup.player.raise()
+            onClicked: {
+                popup.player.raise();
+                popup.closeRequested();
+            }
         }
     }
 }

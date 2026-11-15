@@ -27,8 +27,14 @@ Item {
     property color accent: Kirigami.Theme.highlightColor
     property real accentTint: 0
     property bool showBorder: true
+    property int themeMode: 0
     property bool isDark: true
     property var frameMargins: null
+
+    Widgets.ThemeScope {
+        target: view
+        themeMode: view.themeMode
+    }
 
     signal closeRequested()
     signal closeFinished()
@@ -182,6 +188,52 @@ Item {
             id: search
             Layout.fillWidth: true
             focus: true
+            Binding {
+                target: search
+                property: "Kirigami.Theme.inherit"
+                value: false
+                when: view.themeMode !== 0
+                restoreMode: Binding.RestoreBindingOrValue
+            }
+            Binding {
+                target: search
+                property: "Kirigami.Theme.textColor"
+                value: view.isDark ? "#f2f2f7" : "#1d1d1f"
+                when: view.themeMode !== 0
+                restoreMode: Binding.RestoreBindingOrValue
+            }
+            Binding {
+                target: search
+                property: "color"
+                value: view.isDark ? "#f2f2f7" : "#1d1d1f"
+                when: view.themeMode !== 0
+                restoreMode: Binding.RestoreBindingOrValue
+            }
+            Binding {
+                target: search
+                property: "placeholderTextColor"
+                value: view.isDark ? "#98989d" : "#6e6e73"
+                when: view.themeMode !== 0
+                restoreMode: Binding.RestoreBindingOrValue
+            }
+            Binding {
+                target: search.background
+                property: "opacity"
+                value: 0
+                when: search.background !== null && view.themeMode !== 0
+                restoreMode: Binding.RestoreBindingOrValue
+            }
+            Rectangle {
+                visible: view.themeMode !== 0
+                z: -1
+                anchors.fill: parent
+                radius: Math.round(Kirigami.Units.cornerRadius * 1.5)
+                color: view.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.65)
+                border.width: 1
+                border.color: search.activeFocus
+                    ? view.accent
+                    : (view.isDark ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.14))
+            }
             onTextChanged: grid.currentIndex = 0
             Keys.onEscapePressed: view.closeRequested()
             Keys.onReturnPressed: view.launch(grid.currentIndex)

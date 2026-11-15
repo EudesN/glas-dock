@@ -89,7 +89,8 @@ Item {
             : surface.isDark ? Qt.rgba(0.09, 0.09, 0.12, Math.min(1, surface.bodyAlpha + (surface.isGlass ? 0.12 : 0)))
             : Qt.rgba(1, 1, 1, surface.bodyAlpha)
         border.width: surface.showBorder ? 1 : 0
-        border.color: surface.isFrosted ? Qt.rgba(1, 1, 1, surface.isDark ? 0.14 : 0.38)
+        border.color: surface.st === 3 && !surface.isDark ? Qt.rgba(0, 0, 0, 0.12)
+            : surface.isFrosted ? Qt.rgba(1, 1, 1, surface.isDark ? 0.14 : 0.38)
             : Qt.rgba(1, 1, 1, surface.isDark ? 0.20 : 0.50)
         shadow.size: surface.showShadow && surface.hasBody ? 24 : 0
         shadow.yOffset: 7

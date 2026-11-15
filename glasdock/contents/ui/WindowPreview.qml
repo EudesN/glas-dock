@@ -20,7 +20,7 @@ PlasmaCore.Dialog {
     property var windows: []
     property real anchorX: 0          // global x of the icon center
     property real anchorTop: 0        // global y of the top of the dock bar
-    property int gap: 4
+    property int gap: 10
     property rect screenGeometry: Qt.rect(0, 0, 0, 0)
     property int thumbWidth: 220
 
@@ -28,6 +28,7 @@ PlasmaCore.Dialog {
     property int style: 0
     property real backgroundOpacity: 0.8
     property real radius: 22
+    property int themeMode: 0
     property bool isDark: true
     property color accent: Kirigami.Theme.highlightColor
     property real accentTint: 0
@@ -52,11 +53,6 @@ PlasmaCore.Dialog {
     onWidthChanged: if (visible) reposition()
     onHeightChanged: if (visible) reposition()
 
-    Behavior on x {
-        enabled: preview.visible
-        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
-    }
-
     function reposition() {
         const w = frame.width, h = frame.height;
         const m = frame.shadowMargin;
@@ -67,12 +63,14 @@ PlasmaCore.Dialog {
             nx = Math.max(g.x + margin - m, Math.min(g.x + g.width - margin + m - w, nx));
         }
         x = nx;
-        y = Math.round(anchorTop - gap - h + m);
+        y = Math.round(anchorTop - gap - h + frame.bottomShadowMargin);
     }
 
     mainItem: Item {
         id: frame
+        Widgets.ThemeScope { target: frame; themeMode: preview.themeMode }
         readonly property int shadowMargin: 28
+        readonly property int bottomShadowMargin: gap
         readonly property int padding: Kirigami.Units.largeSpacing
         readonly property int columns: Math.min(Math.max(1, preview.windows.length), 4)
         readonly property int rows: Math.max(1, Math.ceil(preview.windows.length / columns))
@@ -85,7 +83,7 @@ PlasmaCore.Dialog {
         readonly property real cardsHeight: rows * cardHeight + (rows - 1) * Kirigami.Units.smallSpacing
 
         width: cardsWidth + (padding + shadowMargin) * 2
-        height: cardsHeight + (padding + shadowMargin) * 2
+        height: cardsHeight + padding * 2 + shadowMargin + bottomShadowMargin
 
         function fadeIn() {
             panel.opacity = 0;
@@ -98,13 +96,16 @@ PlasmaCore.Dialog {
             NumberAnimation { target: panel; property: "scale"; to: 1; duration: Kirigami.Units.shortDuration * 1.6; easing.type: Easing.OutCubic }
         }
 
-        HoverHandler { id: frameHover }
-
         Item {
             id: panel
             anchors.fill: parent
-            anchors.margins: frame.shadowMargin
+            anchors.topMargin: frame.shadowMargin
+            anchors.leftMargin: frame.shadowMargin
+            anchors.rightMargin: frame.shadowMargin
+            anchors.bottomMargin: frame.bottomShadowMargin
             transformOrigin: Item.Bottom
+
+            HoverHandler { id: frameHover }
 
             Widgets.GlassSurface {
                 anchors.fill: parent
@@ -189,7 +190,8 @@ PlasmaCore.Dialog {
                                 Layout.preferredHeight: Kirigami.Units.iconSizes.small + 4
                                 radius: width / 2
                                 visible: cardArea.containsMouse || closeArea.containsMouse
-                                color: closeArea.containsMouse ? "#e5484d" : Qt.rgba(1, 1, 1, 0.12)
+                                color: closeArea.containsMouse ? "#e5484d"
+                                    : (preview.isDark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.08))
                                 Kirigami.Icon {
                                     anchors.centerIn: parent
                                     width: Kirigami.Units.iconSizes.small - 4

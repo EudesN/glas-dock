@@ -150,10 +150,9 @@ PlasmoidItem {
         shell.run("read", "kreadconfig6 --file plasma_calendar_holiday_regions --group General --key selectedRegions");
     }
 
-    readonly property bool isDark: Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.backgroundColor) === Kirigami.ColorUtils.Dark
-    readonly property color accent: isDark
-        && Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.highlightColor) === Kirigami.ColorUtils.Dark
-        ? Qt.lighter(Kirigami.Theme.highlightColor, 1.5) : Kirigami.Theme.highlightColor
+    Shared.ThemeScope { id: themeScope; target: null; themeMode: root.cfg.themeMode }
+    readonly property bool isDark: themeScope.isDark
+    readonly property color accent: themeScope.accent
 
     preferredRepresentation: fullRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
@@ -163,6 +162,7 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: compact
 
+        Shared.ThemeScope { target: compact; themeMode: root.cfg.themeMode }
         readonly property real pad: Math.round(height * 0.12)
         readonly property bool stacked: root.cfg.showDate && (root.cfg.twoLines || height >= 44)
 
@@ -223,6 +223,7 @@ PlasmoidItem {
             style: root.cfg.popupStyle
             backgroundOpacity: root.cfg.popupOpacity
             radius: root.cfg.popupRadius
+            themeMode: root.cfg.themeMode
             isDark: root.isDark
             accent: root.accent
             animated: root.cfg.popupAnimation

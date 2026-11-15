@@ -26,6 +26,7 @@ PlasmaCore.Dialog {
     property int style: 0
     property real backgroundOpacity: 0.8
     property real radius: 22
+    property int themeMode: 0
     property bool isDark: true
     property color accent: Kirigami.Theme.highlightColor
     property bool animated: true
@@ -115,6 +116,7 @@ PlasmaCore.Dialog {
 
     mainItem: Item {
         id: frame
+        ThemeScope { target: frame; themeMode: popup.themeMode }
         readonly property int shadowMargin: 28
         readonly property int padding: Kirigami.Units.gridUnit
         readonly property int dur: Math.round(popup.animationDuration * Kirigami.Units.longDuration / 200)

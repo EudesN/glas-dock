@@ -263,7 +263,7 @@ Item {
                                 radius: width / 2
                                 color: day.isToday ? popup.accent
                                      : day.isSelected ? Qt.rgba(popup.accent.r, popup.accent.g, popup.accent.b, popup.isDark ? 0.18 : 0.22)
-                                     : dayArea.containsMouse ? Qt.rgba(1, 1, 1, popup.isDark ? 0.10 : 0.4) : "transparent"
+                                     : dayArea.containsMouse ? (popup.isDark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.08)) : "transparent"
                                 border.width: day.isSelected && !day.isToday ? 1.5 : 0
                                 border.color: popup.accent
                                 Behavior on color { ColorAnimation { duration: 100 } }

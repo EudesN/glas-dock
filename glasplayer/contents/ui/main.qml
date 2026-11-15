@@ -28,11 +28,9 @@ PlasmoidItem {
                                     ? Plasmoid.containment.corona.editMode === true : false
     readonly property bool hidden: idle && cfg.hideWhenIdle && !editing
 
-    // on dark themes, dark accent colors are lifted a bit (same rule as the dock)
-    readonly property bool isDark: Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.backgroundColor) === Kirigami.ColorUtils.Dark
-    readonly property color accent: isDark
-        && Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.highlightColor) === Kirigami.ColorUtils.Dark
-        ? Qt.lighter(Kirigami.Theme.highlightColor, 1.5) : Kirigami.Theme.highlightColor
+    Shared.ThemeScope { id: themeScope; target: null; themeMode: root.cfg.themeMode }
+    readonly property bool isDark: themeScope.isDark
+    readonly property color accent: themeScope.accent
 
     preferredRepresentation: fullRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
@@ -43,6 +41,7 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: compact
 
+        Shared.ThemeScope { target: compact; themeMode: root.cfg.themeMode }
         readonly property bool collapsed: root.hidden
         readonly property real pad: Math.round(height * 0.12)
 
@@ -169,6 +168,7 @@ PlasmoidItem {
             style: root.cfg.popupStyle
             backgroundOpacity: root.cfg.popupOpacity
             radius: root.cfg.popupRadius
+            themeMode: root.cfg.themeMode
             isDark: root.isDark
             accent: root.accent
             animated: root.cfg.popupAnimation
@@ -178,6 +178,7 @@ PlasmoidItem {
                 player: root.player
                 accent: root.accent
                 isDark: root.isDark
+                onCloseRequested: popup.close()
             }
         }
     }

@@ -296,12 +296,13 @@ PlasmoidItem {
             }
         }
 
-        // --- system accent color for the dock details (dots, labels, tint)
-        // on dark glass, dark accents (e.g. picked from the wallpaper) are lifted
-        // a bit so the details stay visible
-        readonly property color accent: isDark
-            && Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.highlightColor) === Kirigami.ColorUtils.Dark
-            ? Qt.lighter(Kirigami.Theme.highlightColor, 1.5) : Kirigami.Theme.highlightColor
+        // --- system accent color and Light/Dark theme for the dock and panels
+        Widgets.ThemeScope {
+            id: themeScope
+            target: dock
+            themeMode: dock.cfg.themeMode
+        }
+        readonly property color accent: themeScope.accent
         readonly property color detailColor: cfg.useAccentColor ? accent
             : (isDark ? "white" : Qt.rgba(0, 0, 0, 0.75))
 
@@ -368,6 +369,8 @@ PlasmoidItem {
             onTriggered: {
                 if (!dock.previewTask)
                     return;
+                windowPreview.anchorX = dock.previewTask.mapToGlobal(dock.previewTask.width / 2, 0).x;
+                windowPreview.anchorTop = dock.mapToGlobal(0, glass.y).y;
                 windowPreview.reposition();
                 windowPreview.visible = true;
                 windowPreview.reposition();
@@ -375,8 +378,12 @@ PlasmoidItem {
         }
         // called by the task icons
         function previewEnter(task) {
-            if (!cfg.showPreviews || dragging || contextMenuOpen || task.isLauncher)
+            if (!cfg.showPreviews || dragging || contextMenuOpen)
                 return;
+            if (task.isLauncher) {
+                previewLeave(null);
+                return;
+            }
             previewHideTimer.stop();
             previewTask = task;
             if (windowPreview.visible)
@@ -384,7 +391,9 @@ PlasmoidItem {
             else
                 previewShowTimer.restart();
         }
-        function previewLeave() {
+        function previewLeave(task) {
+            if (task && previewTask !== task)
+                return;
             previewShowTimer.stop();
             if (windowPreview.visible)
                 previewHideTimer.restart();
@@ -399,7 +408,7 @@ PlasmoidItem {
             id: previewHideTimer
             interval: 280
             onTriggered: {
-                if (windowPreview.hovered)
+                if (windowPreview.hovered || (dock.previewTask && dock.previewTask.hovered))
                     return;
                 dock.hidePreview();
             }
@@ -412,6 +421,7 @@ PlasmoidItem {
             style: dock.cfg.dockStyle
             backgroundOpacity: dock.cfg.glassOpacity
             radius: dock.cfg.cornerRadius
+            themeMode: dock.cfg.themeMode
             isDark: dock.isDark
             accent: dock.accent
             accentTint: dock.cfg.glassAccentTint
@@ -419,7 +429,7 @@ PlasmoidItem {
             showShadow: dock.cfg.showShadow
             blurBehind: dock.blurOn
             frost: dock.cfg.blurFrost
-            onHoveredChanged: hovered ? previewHideTimer.stop() : dock.previewLeave()
+            onHoveredChanged: hovered ? previewHideTimer.stop() : dock.previewLeave(null)
             onActivateRequested: (row, child) => {
                 tasksModel.requestActivate(tasksModel.makeModelIndex(row, child));
                 dock.hidePreview();
@@ -472,8 +482,7 @@ PlasmoidItem {
             onTriggered: dock.droppedItem = null
         }
 
-        readonly property bool isDark: Kirigami.ColorUtils.brightnessForColor(
-            Kirigami.Theme.backgroundColor) === Kirigami.ColorUtils.Dark
+        readonly property bool isDark: themeScope.isDark
 
         // --- mouse tracking and zoom amount (0..1, animated)
         property real mouseX: -100000
@@ -797,6 +806,7 @@ PlasmoidItem {
                 accentTint: dock.cfg.glassAccentTint
                 showBorder: dock.cfg.showBorder
                 backgroundOpacity: dock.cfg.launcherOpacity
+                themeMode: dock.cfg.themeMode
                 isDark: dock.isDark
                 frameMargins: launcher.margins
                 animated: dock.cfg.launcherAnimation
@@ -866,7 +876,7 @@ PlasmoidItem {
             }
         }
 
-        Component { id: playerPopupComponent; Widgets.PlayerPopup { player: root.activePlayer; accent: dock.accent; isDark: dock.isDark } }
+        Component { id: playerPopupComponent; Widgets.PlayerPopup { player: root.activePlayer; accent: dock.accent; isDark: dock.isDark; onCloseRequested: popupFrame.playClose() } }
         Component { id: weatherPopupComponent; Widgets.WeatherPopup { weather: root.weatherData; accent: dock.accent; isDark: dock.isDark } }
         Component { id: clockPopupComponent; Widgets.ClockPopup { now: root.now; accent: dock.accent; isDark: dock.isDark } }
 
@@ -956,6 +966,7 @@ PlasmoidItem {
 
             mainItem: Item {
                 id: popupFrame
+                Widgets.ThemeScope { target: popupFrame; themeMode: dock.cfg.themeMode }
                 readonly property int shadowMargin: 28
                 readonly property int padding: Kirigami.Units.gridUnit
                 width: widgetPopupLoader.width + (padding + shadowMargin) * 2
@@ -1086,6 +1097,9 @@ PlasmoidItem {
                 readonly property real size: dock.layout.sizes[slot] ?? dock.baseIcon
                 readonly property bool isLauncher: model.IsLauncher === true
                 readonly property int badgeCount: root.badgeFor(model.AppId, model.LauncherUrlWithoutIcon)
+                readonly property alias hovered: mouse.containsMouse
+
+                Component.onDestruction: if (dock.previewTask === task) dock.hidePreview()
                 property real bounce: 0
                 property bool launching: false
 
@@ -1379,7 +1393,7 @@ PlasmoidItem {
                     acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
                     preventStealing: true
 
-                    onContainsMouseChanged: containsMouse ? dock.previewEnter(task) : dock.previewLeave()
+                    onContainsMouseChanged: containsMouse ? dock.previewEnter(task) : dock.previewLeave(task)
 
                     property point pressPos
                     property bool dragActive: false

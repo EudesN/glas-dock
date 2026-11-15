@@ -96,9 +96,9 @@ Item {
                     implicitWidth: chip.implicitWidth + Kirigami.Units.largeSpacing * 2
                     implicitHeight: chip.implicitHeight + Kirigami.Units.smallSpacing * 2
                     radius: height / 2
-                    color: popup.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.4)
+                    color: popup.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.50)
                     border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, popup.isDark ? 0.10 : 0.45)
+                    border.color: popup.isDark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.08)
                     PC3.Label { id: chip; anchors.centerIn: parent; text: modelData; font: Kirigami.Theme.smallFont }
                 }
             }

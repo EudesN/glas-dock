@@ -46,6 +46,7 @@ KCM.SimpleKCM {
     property alias cfg_pillBackground: pillBackground.checked
     // style 4 (the old "Blur" style) shows as Glass with blur on
     property int cfg_popupStyle
+    property alias cfg_themeMode: themeMode.currentIndex
     property bool cfg_popupBlur
     property alias cfg_popupFrost: blurFrost.value
     property alias cfg_popupOpacity: popupOpacity.value
@@ -121,6 +122,11 @@ KCM.SimpleKCM {
                     cfg_popupBlur = true;
                 cfg_popupStyle = index;
             }
+        }
+        QQC2.ComboBox {
+            id: themeMode
+            Kirigami.FormData.label: "Theme:"
+            model: ["Follow system", "Dark", "Light"]
         }
         RowLayout {
             Kirigami.FormData.label: "Opacity:"
