@@ -146,7 +146,6 @@ KCM.SimpleKCM {
         QQC2.SpinBox {
             id: bottomMargin
             Kirigami.FormData.label: "Distance from screen edge:"
-            enabled: dockStyle.currentIndex !== 4
             from: 0; to: 48; stepSize: 1
             textFromValue: v => v + " px"
             valueFromText: t => parseInt(t)

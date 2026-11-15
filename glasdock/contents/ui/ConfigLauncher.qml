@@ -49,6 +49,7 @@ KCM.SimpleKCM {
         }
         RowLayout {
             Kirigami.FormData.label: "Opacity:"
+            enabled: launcherStyle.currentIndex === 0 || launcherStyle.currentIndex === 1
             QQC2.Slider { id: launcherOpacity; from: 0.0; to: 1.0; stepSize: 0.01 }
             QQC2.Label { text: Math.round(launcherOpacity.value * 100) + "%"  }
         }
@@ -64,17 +65,18 @@ KCM.SimpleKCM {
         QQC2.ComboBox {
             id: launcherBlur
             Kirigami.FormData.label: "Blur behind:"
+            enabled: launcherStyle.currentIndex !== 3
             model: ["Same as the dock", "On", "Off"]
         }
         RowLayout {
             Kirigami.FormData.label: "Frost:"
-            enabled: launcherBlur.currentIndex === 1
+            enabled: launcherStyle.currentIndex !== 3 && launcherBlur.currentIndex === 1
             QQC2.Slider { id: launcherFrost; from: 0.0; to: 1.0; stepSize: 0.01 }
             QQC2.Label { text: Math.round(launcherFrost.value * 100) + "%" }
         }
         RowLayout {
             Kirigami.FormData.label: "Blur strength:"
-            enabled: launcherBlur.currentIndex !== 2
+            enabled: launcherStyle.currentIndex !== 3 && launcherBlur.currentIndex !== 2
             QQC2.Button {
                 text: "Desktop Effects…"
                 icon.name: "preferences-desktop-effects"

@@ -14,6 +14,8 @@ Tile {
     readonly property bool hasPlayer: player !== null && player !== undefined
     readonly property bool playing: hasPlayer && player.playbackStatus === Mpris.PlaybackStatus.Playing
 
+    onMiddleClicked: if (hasPlayer) player.playPause()
+
     RowLayout {
         anchors.fill: parent
         anchors.margins: Math.round(tile.height * 0.12)
@@ -46,21 +48,39 @@ Tile {
 
         // play / pause
         Item {
-            Layout.preferredWidth: tile.height * 0.5
-            Layout.preferredHeight: tile.height * 0.5
+            Layout.preferredWidth: Math.round(tile.height * 0.62)
+            Layout.preferredHeight: Layout.preferredWidth
             visible: tile.hasPlayer
-            Kirigami.Icon {
+            Rectangle {
                 anchors.fill: parent
+                radius: width / 2
+                color: Kirigami.Theme.textColor
+                opacity: playArea.pressed ? 0.18 : playArea.containsMouse ? 0.10 : 0
+                Behavior on opacity { NumberAnimation { duration: 100 } }
+            }
+            Kirigami.Icon {
+                anchors.centerIn: parent
+                width: Math.round(tile.height * 0.46)
+                height: width
                 source: tile.playing ? "media-playback-pause" : "media-playback-start"
                 opacity: playArea.containsMouse ? 1 : 0.85
             }
             MouseArea {
                 id: playArea
                 anchors.fill: parent
-                anchors.margins: -4
+                anchors.margins: -2
                 hoverEnabled: true
-                onClicked: tile.player.PlayPause()
+                onClicked: tile.player.playPause()
             }
+        }
+    }
+
+    WheelHandler {
+        onWheel: event => {
+            if (!tile.hasPlayer)
+                return;
+            if (event.angleDelta.y > 0 && tile.player.canGoPrevious) tile.player.previous();
+            else if (event.angleDelta.y < 0 && tile.player.canGoNext) tile.player.next();
         }
     }
 }

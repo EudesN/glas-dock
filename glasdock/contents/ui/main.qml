@@ -143,7 +143,8 @@ PlasmoidItem {
 
     property date now: new Date()
     Timer {
-        interval: 1000
+        // every second only while the clock panel is open; otherwise on the minute
+        interval: (root.dockItem && root.dockItem.clockPopupOpen) ? 1000 : (60 - root.now.getSeconds()) * 1000
         repeat: true
         running: Plasmoid.configuration.showClock
         triggeredOnStart: true
@@ -320,6 +321,7 @@ PlasmoidItem {
                     uuid: String(ids[0]),
                     title: tasksModel.data(idx, Qt.DisplayRole) || "",
                     icon: tasksModel.data(idx, Qt.DecorationRole),
+                    active: tasksModel.data(idx, TaskManager.AbstractTasksModel.IsActive) === true,
                     row: row, child: child
                 });
             };
@@ -581,10 +583,10 @@ PlasmoidItem {
 
         // Watchdog: if an icon ever ends up outside the bar or the widget, log the
         // numbers (journalctl --user | grep Glasdock) so the cause can be found.
+        onSlotsChanged: if (dock.visible && taskRepeater.count > 0) watchdogTimer.restart()
         Timer {
-            interval: 1000
-            repeat: true
-            running: dock.visible && taskRepeater.count > 0
+            id: watchdogTimer
+            interval: 300
             onTriggered: {
                 const li = taskRepeater.itemAt(taskRepeater.count - 1);
                 if (!li || !li.visible || dock.dragging)
@@ -632,10 +634,15 @@ PlasmoidItem {
             delegate: Rectangle {
                 required property real modelData
                 x: Math.round(modelData)
-                y: dock.barY + dock.barHeight * 0.2
+                y: dock.barY + dock.barHeight * 0.16
                 width: 1
-                height: dock.barHeight * 0.6
-                color: Qt.rgba(1, 1, 1, dock.isDark ? 0.22 : 0.55)
+                height: dock.barHeight * 0.68
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "transparent" }
+                    GradientStop { position: 0.25; color: Qt.rgba(1, 1, 1, dock.isDark ? 0.24 : 0.58) }
+                    GradientStop { position: 0.75; color: Qt.rgba(1, 1, 1, dock.isDark ? 0.24 : 0.58) }
+                    GradientStop { position: 1.0; color: "transparent" }
+                }
             }
         }
 
@@ -655,32 +662,13 @@ PlasmoidItem {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: dock.iconMax
                 height: dock.iconMax
-                scale: appsButton.size / dock.iconMax
+                property real pressScale: appsMouse.pressed ? 0.90 : 1.0
+                Behavior on pressScale { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
+                scale: (appsButton.size / dock.iconMax) * pressScale
                 transformOrigin: Item.Bottom
                 source: dock.cfg.appsButtonIcon
-                opacity: appsMouse.pressed ? 0.65 : 1
-            }
-
-            Rectangle {
-                opacity: dock.cfg.showLabels && appsMouse.containsMouse ? 1 : 0
-                visible: opacity > 0
-                Behavior on opacity { NumberAnimation { duration: 140 } }
-                width: appsLabel.implicitWidth + Kirigami.Units.largeSpacing * 2
-                height: appsLabel.implicitHeight + Kirigami.Units.smallSpacing * 2
-                radius: height / 2
-                x: (appsButton.width - width) / 2
-                y: Math.max(-appsButton.y, -height - Kirigami.Units.smallSpacing * 2)
-                color: dock.isDark ? Qt.rgba(0.12, 0.12, 0.14, 0.85) : Qt.rgba(1, 1, 1, 0.85)
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, dock.isDark ? 0.15 : 0.6)
-                Text {
-                    id: appsLabel
-                    anchors.centerIn: parent
-                    text: "Applications"
-                    color: dock.isDark ? "white" : "#1d1d1f"
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize
-                    renderType: Text.NativeRendering
-                }
+                opacity: appsMouse.pressed ? 0.85 : 1
+                Behavior on opacity { NumberAnimation { duration: 90 } }
             }
 
             MouseArea {
@@ -732,6 +720,8 @@ PlasmoidItem {
         function toggleLauncher() {
             if (!launcherLoader.active)
                 launcherLoader.active = true;
+            if (!launcherView)
+                return;
             // a click on the button first deactivates the popup (which starts
             // closing it); don't reopen it right away
             if (launcherView.closing || Date.now() - launcherHiddenAt < 250)
@@ -741,11 +731,9 @@ PlasmoidItem {
                 return;
             }
             launcherView.reset();
-            launcher.reposition();
             launcher.visible = true;
             launcher.reposition();
             launcher.requestActivate();
-            launcherView.reset();
             launcherView.playOpen();
         }
 
@@ -778,7 +766,13 @@ PlasmoidItem {
                 const p = dock.mapToGlobal(glass.x + glass.width / 2, glass.y);
                 const w = launcherLoader.width + margins.left + margins.right;
                 const h = launcherLoader.height + margins.top + margins.bottom;
-                x = Math.round(p.x - w / 2);
+                let nx = Math.round(p.x - w / 2);
+                const g = Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0);
+                if (g.width > 0) {
+                    const margin = Kirigami.Units.smallSpacing * 2;
+                    nx = Math.max(g.x + margin, Math.min(g.x + g.width - margin - w, nx));
+                }
+                x = nx;
                 y = Math.round(p.y - dock.cfg.launcherGap - h);
             }
 
@@ -792,7 +786,7 @@ PlasmoidItem {
                 height: launcherLoader.height
                 appletInterface: root
                 iconSize: dock.cfg.launcherIconSize
-                style: dock.cfg.launcherStyle
+                style: dock.cfg.launcherStyle === 4 ? 0 : dock.cfg.launcherStyle
                 // launcherBlur: 0 = same as the dock, 1 = on, 2 = off
                 blurBehind: dock.cfg.launcherBlur === 1 ? true
                           : dock.cfg.launcherBlur === 2 ? false
@@ -821,10 +815,15 @@ PlasmoidItem {
             // separator between apps and widgets
             visible: dock.widgetsWidth > 0
             x: Math.round(dock.layout.iconsEnd + dock.sepGap / 2)
-            y: dock.barY + dock.barHeight * 0.2
+            y: dock.barY + dock.barHeight * 0.16
             width: 1
-            height: dock.barHeight * 0.6
-            color: Qt.rgba(1, 1, 1, dock.isDark ? 0.18 : 0.5)
+            height: dock.barHeight * 0.68
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 0.25; color: Qt.rgba(1, 1, 1, dock.isDark ? 0.22 : 0.55) }
+                GradientStop { position: 0.75; color: Qt.rgba(1, 1, 1, dock.isDark ? 0.22 : 0.55) }
+                GradientStop { position: 1.0; color: "transparent" }
+            }
         }
 
         Row {
@@ -872,6 +871,8 @@ PlasmoidItem {
         Component { id: clockPopupComponent; Widgets.ClockPopup { now: root.now; accent: dock.accent; isDark: dock.isDark } }
 
         property double widgetPopupHiddenAt: 0
+        readonly property bool clockPopupOpen: popupOpenFor(clockTile)
+        onClockPopupOpenChanged: if (clockPopupOpen) root.now = new Date()
         // the tile whose panel is open stays highlighted
         function popupOpenFor(tile) {
             return widgetPopup.visible && widgetPopupAnchor === tile && !popupFrame.closing;
@@ -940,11 +941,17 @@ PlasmoidItem {
                 const a = dock.widgetPopupAnchor;
                 const p = a.mapToGlobal(a.width / 2, 0);
                 const top = dock.mapToGlobal(0, glass.y).y;
-                // the frame has a transparent margin for the shadow (or Plasma's
-                // frame margins in Blur style)
+                // the frame has a transparent margin for the shadow
                 const w = popupFrame.width, h = popupFrame.height;
-                x = Math.round(p.x - w / 2);
-                y = Math.round(top - dock.cfg.launcherGap - h + popupFrame.shadowMargin);
+                const m = popupFrame.shadowMargin;
+                let nx = Math.round(p.x - w / 2);
+                const g = Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0);
+                if (g.width > 0) {
+                    const margin = Kirigami.Units.smallSpacing * 2;
+                    nx = Math.max(g.x + margin - m, Math.min(g.x + g.width - margin + m - w, nx));
+                }
+                x = nx;
+                y = Math.round(top - dock.cfg.launcherGap - h + m);
             }
 
             mainItem: Item {
@@ -1184,16 +1191,18 @@ PlasmoidItem {
                     // rendered at max size and scaled down: sharp and cheap
                     width: dock.iconMax
                     height: dock.iconMax
-                    scale: task.size / dock.iconMax
+                    property real pressScale: mouse.pressed && !task.dragged ? 0.90 : (task.dragged ? 1.06 : 1.0)
+                    Behavior on pressScale { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
+                    scale: (task.size / dock.iconMax) * pressScale
                     transformOrigin: Item.Bottom
                     source: task.model.decoration
-                    opacity: mouse.pressed ? 0.65 : 1
+                    opacity: mouse.pressed && !task.dragged ? 0.85 : 1
                     Behavior on opacity { NumberAnimation { duration: 90 } }
                 }
 
                 // notification badge (top-right of the icon):
                 // a plain dot for a single notification, the number when there are more
-                Rectangle {
+                Kirigami.ShadowedRectangle {
                     id: badge
                     readonly property bool shown: dock.cfg.showBadges && task.badgeCount > 0 && !task.dragged
                     readonly property bool numeric: task.badgeCount > 1
@@ -1208,7 +1217,10 @@ PlasmoidItem {
                     // system accent color by default (red is the alternative)
                     color: dock.cfg.badgeUseAccent ? dock.accent : "#ff3b30"
                     border.width: 1
-                    border.color: Qt.rgba(0, 0, 0, 0.18)
+                    border.color: Qt.rgba(1, 1, 1, 0.32)
+                    shadow.size: 8
+                    shadow.yOffset: 2
+                    shadow.color: Qt.rgba(0, 0, 0, 0.38)
                     scale: shown ? 1 : 0
                     visible: scale > 0
                     Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack } }
@@ -1227,51 +1239,119 @@ PlasmoidItem {
                 }
 
                 // running indicator
-                // (active app: a wider pill with a soft glow in the accent color)
-                Rectangle {
-                    id: dot
+                // (1 dot for 1 window, 2 for 2 windows, 3 for 3+ windows;
+                //  the active window's dot expands into a glowing pill)
+                Item {
+                    id: indicator
                     visible: !task.isLauncher && !task.dragged
-                    readonly property bool active: task.model.IsActive === true
-                    width: active ? 12 : 5
-                    height: 5
-                    radius: 2.5
-                    x: (task.width - width) / 2
-                    y: dock.barY + dock.barHeight - dock.pad / 2 - height / 2 - task.y
-                    color: dock.detailColor
-                    opacity: active ? 1 : 0.6
-                    Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    readonly property bool rawActive: task.model.IsActive === true
+                    property bool active: rawActive
+                    onRawActiveChanged: {
+                        if (rawActive) {
+                            deactivateTimer.stop();
+                            active = true;
+                        } else {
+                            deactivateTimer.restart();
+                        }
+                    }
+                    Timer {
+                        id: deactivateTimer
+                        interval: 60
+                        onTriggered: indicator.active = indicator.rawActive
+                    }
 
-                    Rectangle {
+                    readonly property int winCount: {
+                        dock.modelRevision;
+                        const c = task.model.ChildCount || 0;
+                        return c > 1 ? c : 1;
+                    }
+                    readonly property int dotCount: Math.min(winCount, 3)
+
+                    property int activeSlot: 0
+                    readonly property int currentChildSlot: {
+                        dock.modelRevision;
+                        const n = task.model.ChildCount || 0;
+                        if (n <= 1)
+                            return 0;
+                        for (let c = 0; c < n; c++) {
+                            if (tasksModel.data(task.modelIndex(c), TaskManager.AbstractTasksModel.IsActive))
+                                return c % dotCount;
+                        }
+                        return -1;
+                    }
+                    onCurrentChildSlotChanged: {
+                        if (currentChildSlot >= 0)
+                            activeSlot = currentChildSlot;
+                    }
+                    onDotCountChanged: {
+                        if (activeSlot >= dotCount)
+                            activeSlot = Math.max(0, dotCount - 1);
+                    }
+
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: dock.barY + dock.barHeight - dock.pad / 2 - 2.5 - task.y
+                    width: dotsRow.width
+                    height: 5
+
+                    Row {
+                        id: dotsRow
                         anchors.centerIn: parent
-                        width: parent.width + 8
-                        height: parent.height + 8
-                        radius: height / 2
-                        color: dock.detailColor
-                        opacity: dot.active && dock.cfg.useAccentColor ? 0.25 : 0
-                        z: -1
+                        spacing: 4
+
+                        Repeater {
+                            model: indicator.dotCount
+                            delegate: Rectangle {
+                                required property int index
+                                readonly property bool isCurrent: indicator.active && index === indicator.activeSlot
+                                width: isCurrent ? (indicator.dotCount === 1 ? 14 : (indicator.dotCount === 2 ? 10 : 8)) : 4.5
+                                height: 4.5
+                                radius: 2.25
+                                color: dock.detailColor
+                                opacity: isCurrent ? 1.0 : 0.62
+                                Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                                Behavior on opacity { NumberAnimation { duration: 150 } }
+                                Behavior on color { ColorAnimation { duration: 150 } }
+
+                                Rectangle {
+                                    anchors.centerIn: parent
+                                    width: parent.width + 3
+                                    height: parent.height + 3
+                                    radius: height / 2
+                                    color: dock.detailColor
+                                    opacity: parent.isCurrent && dock.cfg.useAccentColor ? 0.24 : 0
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                                    z: -1
+                                }
+                            }
+                        }
                     }
                 }
 
                 // app name on hover
-                Rectangle {
+                Kirigami.ShadowedRectangle {
                     id: label
                     readonly property bool shown: dock.cfg.showLabels && mouse.containsMouse
                                                   && !(dock.previewOpen && dock.previewTask === task)
                                                   && !dock.contextMenuOpen && !dock.dragging
                     opacity: shown ? 1 : 0
                     visible: opacity > 0
-                    Behavior on opacity { NumberAnimation { duration: 140 } }
+                    scale: 0.92 + 0.08 * opacity
+                    transformOrigin: Item.Bottom
+                    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
                     width: labelText.implicitWidth + Kirigami.Units.largeSpacing * 2
                     height: labelText.implicitHeight + Kirigami.Units.smallSpacing * 2
                     radius: height / 2
                     x: (task.width - width) / 2
                     y: Math.max(-task.y, -height - Kirigami.Units.smallSpacing * 2)
-                    color: dock.isDark ? Qt.rgba(0.12, 0.12, 0.14, 0.85) : Qt.rgba(1, 1, 1, 0.85)
+                    color: dock.isDark ? Qt.rgba(0.10, 0.10, 0.13, 0.88) : Qt.rgba(1, 1, 1, 0.88)
                     border.width: 1
                     border.color: dock.cfg.useAccentColor
                         ? Qt.rgba(dock.accent.r, dock.accent.g, dock.accent.b, 0.7)
-                        : Qt.rgba(1, 1, 1, dock.isDark ? 0.15 : 0.6)
+                        : Qt.rgba(1, 1, 1, dock.isDark ? 0.18 : 0.6)
+                    shadow.size: 12
+                    shadow.yOffset: 3
+                    shadow.color: Qt.rgba(0, 0, 0, dock.isDark ? 0.45 : 0.20)
 
                     Text {
                         id: labelText
@@ -1279,6 +1359,7 @@ PlasmoidItem {
                         text: task.model.AppName || task.model.display || ""
                         color: dock.isDark ? "white" : "#1d1d1f"
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize
+                        font.weight: Font.Medium
                         renderType: Text.NativeRendering
                     }
                 }

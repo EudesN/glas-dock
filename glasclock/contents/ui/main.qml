@@ -145,7 +145,7 @@ PlasmoidItem {
     }
     Component.onCompleted: {
         // time zone (also old aliases like Brazil/East) -> canonical zone -> ISO country
-        const script = Qt.resolvedUrl("../code/country.sh").toString().replace("file://", "");
+        const script = decodeURIComponent(Qt.resolvedUrl("../code/country.sh").toString().replace("file://", ""));
         shell.run("country", "sh '" + script + "'");
         shell.run("read", "kreadconfig6 --file plasma_calendar_holiday_regions --group General --key selectedRegions");
     }

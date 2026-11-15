@@ -76,7 +76,7 @@ PlasmoidItem {
             acceptedButtons: Qt.LeftButton | Qt.MiddleButton
             onClicked: mouse => {
                 if (mouse.button === Qt.MiddleButton && root.hasPlayer)
-                    root.player.PlayPause();
+                    root.player.playPause();
                 else
                     popup.toggle();
             }
@@ -84,8 +84,8 @@ PlasmoidItem {
                 // scroll to skip tracks
                 if (!root.hasPlayer)
                     return;
-                if (wheel.angleDelta.y > 0 && root.player.canGoPrevious) root.player.Previous();
-                else if (wheel.angleDelta.y < 0 && root.player.canGoNext) root.player.Next();
+                if (wheel.angleDelta.y > 0 && root.player.canGoPrevious) root.player.previous();
+                else if (wheel.angleDelta.y < 0 && root.player.canGoNext) root.player.next();
             }
         }
 
@@ -149,9 +149,9 @@ PlasmoidItem {
                             hoverEnabled: true
                             enabled: ctl.enabledNow
                             onClicked: {
-                                if (ctl.modelData === "prev") root.player.Previous();
-                                else if (ctl.modelData === "next") root.player.Next();
-                                else root.player.PlayPause();
+                                if (ctl.modelData === "prev") root.player.previous();
+                                else if (ctl.modelData === "next") root.player.next();
+                                else root.player.playPause();
                             }
                         }
                     }

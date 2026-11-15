@@ -52,6 +52,11 @@ PlasmaCore.Dialog {
     onWidthChanged: if (visible) reposition()
     onHeightChanged: if (visible) reposition()
 
+    Behavior on x {
+        enabled: preview.visible
+        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+    }
+
     function reposition() {
         const w = frame.width, h = frame.height;
         const m = frame.shadowMargin;
@@ -134,11 +139,16 @@ PlasmaCore.Dialog {
                         height: frame.cardHeight
                         radius: Math.round(preview.radius * 0.6)
                         color: cardArea.containsMouse
-                            ? (preview.isDark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.55))
-                            : "transparent"
-                        border.width: cardArea.containsMouse ? 1 : 0
-                        border.color: Qt.rgba(preview.accent.r, preview.accent.g, preview.accent.b, 0.6)
-                        Behavior on color { ColorAnimation { duration: 100 } }
+                            ? (preview.isDark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(1, 1, 1, 0.60))
+                            : card.modelData.active
+                            ? (preview.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.42))
+                            : (preview.isDark ? Qt.rgba(1, 1, 1, 0.04) : Qt.rgba(1, 1, 1, 0.26))
+                        border.width: 1
+                        border.color: cardArea.containsMouse || card.modelData.active
+                            ? Qt.rgba(preview.accent.r, preview.accent.g, preview.accent.b, cardArea.containsMouse ? 0.72 : 0.42)
+                            : Qt.rgba(1, 1, 1, preview.isDark ? 0.08 : 0.35)
+                        Behavior on color { ColorAnimation { duration: 110 } }
+                        Behavior on border.color { ColorAnimation { duration: 110 } }
 
                         MouseArea {
                             id: cardArea
@@ -171,7 +181,8 @@ PlasmaCore.Dialog {
                                 Layout.fillWidth: true
                                 text: card.modelData.title
                                 elide: Text.ElideRight
-                                font: Kirigami.Theme.smallFont
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                font.weight: card.modelData.active ? Font.DemiBold : Font.Normal
                             }
                             Rectangle {
                                 Layout.preferredWidth: Kirigami.Units.iconSizes.small + 4

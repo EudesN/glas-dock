@@ -19,6 +19,7 @@ Tile {
             text: Qt.formatTime(tile.now, Qt.locale().timeFormat(Locale.ShortFormat))
             font.pixelSize: Math.round(tile.height * 0.36)
             font.weight: Font.DemiBold
+            font.features: { "tnum": 1 }
         }
         PC3.Label {
             Layout.alignment: Qt.AlignHCenter

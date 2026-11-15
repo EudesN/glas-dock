@@ -71,11 +71,11 @@ and seeking work).
 
 ## Known limitations
 
-- The launcher's custom glass background cannot blur the desktop behind it
-  (QML has no API for KWin blur). The theme background keeps the blur.
+- Real blur behind the glass requires the included `org.glasdock.blur` C++
+  helper plugin (built automatically by `install.sh` when Qt 6 and KF6
+  WindowSystem development headers are installed) and KWin's *Blur* effect enabled.
 - Badges count unread notifications only; app-provided counters (Unity
   LauncherEntry, used by Telegram/Discord) are not read yet.
-- No real blur behind the dock (QML has no API for KWin blur).
 - Horizontal panels only.
 
 ## License

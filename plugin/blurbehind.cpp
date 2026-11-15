@@ -1,12 +1,16 @@
 #include "blurbehind.h"
 
 #include <KWindowEffects>
+#include <QList>
 #include <QPainterPath>
-#include <QRegion>
+#include <utility>
+
+static QList<BlurBehind *> s_instances;
 
 BlurBehind::BlurBehind(QQuickItem *parent)
     : QQuickItem(parent)
 {
+    s_instances.append(this);
     setFlag(ItemHasContents, false);
 
     m_applyTimer.setSingleShot(true);
@@ -24,7 +28,8 @@ BlurBehind::BlurBehind(QQuickItem *parent)
 
 BlurBehind::~BlurBehind()
 {
-    clear();
+    s_instances.removeOne(this);
+    updateWindow(m_window);
 }
 
 void BlurBehind::setActive(bool active)
@@ -38,7 +43,7 @@ void BlurBehind::setActive(bool active)
 
 void BlurBehind::setRadius(qreal radius)
 {
-    if (qFuzzyCompare(m_radius, radius))
+    if (qFuzzyCompare(1.0 + m_radius, 1.0 + radius))
         return;
     m_radius = radius;
     Q_EMIT radiusChanged();
@@ -62,10 +67,13 @@ void BlurBehind::setWindow(QQuickWindow *window)
 {
     if (m_window == window)
         return;
-    clear();
+    QQuickWindow *oldWindow = m_window;
     if (m_window)
         disconnect(m_window, nullptr, this, nullptr);
     m_window = window;
+    m_region = QRegion();
+    m_lastRect = QRectF();
+    updateWindow(oldWindow);
     if (!m_window)
         return;
     // the item can move without its own geometry changing (a parent moved), so
@@ -83,6 +91,8 @@ void BlurBehind::setWindow(QQuickWindow *window)
 
 void BlurBehind::checkSceneRect()
 {
+    if (!m_active || !isVisible())
+        return;
     const QRectF r = mapRectToScene(boundingRect());
     if (r != m_lastRect)
         scheduleApply();
@@ -100,18 +110,28 @@ void BlurBehind::apply()
     const QRectF r = mapRectToScene(boundingRect());
     m_lastRect = r;
     if (!m_active || !isVisible() || r.isEmpty()) {
-        KWindowEffects::enableBlurBehind(m_window, false);
+        m_region = QRegion();
+        updateWindow(m_window);
         return;
     }
     QPainterPath path;
     const qreal radius = qMin(m_radius, qMin(r.width(), r.height()) / 2.0);
     path.addRoundedRect(r, radius, radius);
-    const QRegion region(path.toFillPolygon().toPolygon());
-    KWindowEffects::enableBlurBehind(m_window, true, region);
+    m_region = QRegion(path.toFillPolygon().toPolygon());
+    updateWindow(m_window);
 }
 
-void BlurBehind::clear()
+void BlurBehind::updateWindow(QQuickWindow *window)
 {
-    if (m_window)
-        KWindowEffects::enableBlurBehind(m_window, false);
+    if (!window)
+        return;
+    QRegion total;
+    for (const BlurBehind *item : std::as_const(s_instances)) {
+        if (item->m_window == window && item->m_active && item->isVisible() && !item->m_region.isEmpty())
+            total += item->m_region;
+    }
+    if (total.isEmpty())
+        KWindowEffects::enableBlurBehind(window, false);
+    else
+        KWindowEffects::enableBlurBehind(window, true, total);
 }

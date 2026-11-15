@@ -199,7 +199,7 @@ Item {
 
             // ---------------------------------------------------- categories
             QQC2.ScrollView {
-                Layout.preferredWidth: Kirigami.Units.gridUnit * 11
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 12
                 Layout.fillHeight: true
                 visible: !view.searching
                 PC3.ScrollBar.horizontal.policy: PC3.ScrollBar.AlwaysOff
@@ -208,13 +208,18 @@ Item {
                     id: categories
                     clip: true
                     model: rootModel
-                    spacing: 2
-                    header: CategoryButton {
+                    spacing: 6
+                    header: Item {
                         width: categories.width
-                        text: "Favorites"
-                        iconSource: "bookmarks"
-                        checked: view.currentCategory === -1
-                        onClicked: view.currentCategory = -1
+                        height: favBtn.implicitHeight + categories.spacing
+                        CategoryButton {
+                            id: favBtn
+                            width: parent.width
+                            text: "Favorites"
+                            iconSource: "bookmarks"
+                            checked: view.currentCategory === -1
+                            onClicked: view.currentCategory = -1
+                        }
                     }
                     delegate: CategoryButton {
                         required property int index
@@ -228,9 +233,11 @@ Item {
                 }
             }
 
-            Kirigami.Separator {
+            Rectangle {
                 Layout.fillHeight: true
+                width: 1
                 visible: !view.searching
+                color: view.isDark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.12)
             }
 
             // ----------------------------------------------------------- apps
@@ -247,7 +254,18 @@ Item {
                 cellWidth: Math.floor(width / columns)
                 cellHeight: view.iconSize + Kirigami.Units.gridUnit * 3
                 highlightMoveDuration: 0
-                highlight: PlasmaExtras.Highlight {}
+                highlight: Item {
+                    width: grid.cellWidth
+                    height: grid.cellHeight
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: 3
+                        radius: Math.round(Kirigami.Units.cornerRadius * 1.8)
+                        color: view.isDark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(1, 1, 1, 0.52)
+                        border.width: 1
+                        border.color: Qt.rgba(view.accent.r, view.accent.g, view.accent.b, 0.55)
+                    }
+                }
                 // the scrollbar sits beside the grid (not over the last column)
                 QQC2.ScrollBar.vertical: gridScroll
 
@@ -286,7 +304,8 @@ Item {
                             Layout.preferredWidth: view.iconSize
                             Layout.preferredHeight: view.iconSize
                             source: cell.model.decoration
-                            active: cellMouse.containsMouse
+                            scale: cellMouse.pressed ? 0.92 : (cellMouse.containsMouse ? 1.06 : 1.0)
+                            Behavior on scale { NumberAnimation { duration: 130; easing.type: Easing.OutCubic } }
                         }
                         PC3.Label {
                             id: cellLabel
@@ -375,45 +394,74 @@ Item {
 
             Item { Layout.fillWidth: true }
 
-            PC3.ToolButton {
+            Widgets.GlassButton {
                 text: "Sleep"
-                icon.name: "system-suspend"
+                iconName: "system-suspend"
+                iconSize: Kirigami.Units.iconSizes.small
+                isDark: view.isDark
+                accent: view.accent
                 onClicked: { view.closeRequested(); view.runCommand("systemctl suspend"); }
             }
-            PC3.ToolButton {
+            Widgets.GlassButton {
                 text: "Restart"
-                icon.name: "system-reboot"
+                iconName: "system-reboot"
+                iconSize: Kirigami.Units.iconSizes.small
+                isDark: view.isDark
+                accent: view.accent
                 onClicked: { view.closeRequested(); view.runCommand("qdbus6 org.kde.LogoutPrompt /LogoutPrompt org.kde.LogoutPrompt.promptReboot"); }
             }
-            PC3.ToolButton {
+            Widgets.GlassButton {
                 text: "Shut Down"
-                icon.name: "system-shutdown"
+                iconName: "system-shutdown"
+                iconSize: Kirigami.Units.iconSizes.small
+                isDark: view.isDark
+                accent: view.accent
                 onClicked: { view.closeRequested(); view.runCommand("qdbus6 org.kde.LogoutPrompt /LogoutPrompt org.kde.LogoutPrompt.promptShutDown"); }
             }
-            PC3.ToolButton {
+            Widgets.GlassButton {
                 text: "Log Out"
-                icon.name: "system-log-out"
+                iconName: "system-log-out"
+                iconSize: Kirigami.Units.iconSizes.small
+                isDark: view.isDark
+                accent: view.accent
                 onClicked: { view.closeRequested(); view.runCommand("qdbus6 org.kde.LogoutPrompt /LogoutPrompt org.kde.LogoutPrompt.promptLogout"); }
             }
         }
     }
 
     component CategoryButton: PC3.ItemDelegate {
+        id: catBtn
         property var iconSource
+        readonly property int iconPx: Kirigami.Units.iconSizes.smallMedium + 2
         checkable: false
         highlighted: checked
-        icon.width: Kirigami.Units.iconSizes.smallMedium
-        icon.height: Kirigami.Units.iconSizes.smallMedium
+        topPadding: 7
+        bottomPadding: 7
+        leftPadding: Kirigami.Units.largeSpacing + 2
+        rightPadding: Kirigami.Units.largeSpacing + 2
+        implicitHeight: Math.max(contentItem.implicitHeight + topPadding + bottomPadding,
+                                 Math.round(Kirigami.Units.gridUnit * 2.0))
+        background: Rectangle {
+            radius: height / 2
+            color: catBtn.checked
+                ? Qt.rgba(view.accent.r, view.accent.g, view.accent.b, view.isDark ? 0.22 : 0.26)
+                : catBtn.hovered ? (view.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.06)) : "transparent"
+            border.width: catBtn.checked ? 1 : 0
+            border.color: Qt.rgba(view.accent.r, view.accent.g, view.accent.b, 0.55)
+            Behavior on color { ColorAnimation { duration: 100 } }
+        }
         contentItem: RowLayout {
-            spacing: Kirigami.Units.mediumSpacing
+            spacing: Kirigami.Units.largeSpacing
             Kirigami.Icon {
-                Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
-                Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
-                source: parent.parent.iconSource
+                Layout.preferredWidth: catBtn.iconPx
+                Layout.preferredHeight: catBtn.iconPx
+                source: catBtn.iconSource
             }
             PC3.Label {
                 Layout.fillWidth: true
-                text: parent.parent.text
+                text: catBtn.text
+                font.pixelSize: Math.round(Kirigami.Theme.defaultFont.pixelSize * 1.08)
+                font.weight: catBtn.checked ? Font.DemiBold : Font.Normal
                 elide: Text.ElideRight
             }
         }

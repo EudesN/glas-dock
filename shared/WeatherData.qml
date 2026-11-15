@@ -25,11 +25,21 @@ Item {
     onCityChanged: geocode()
     onFahrenheitChanged: fetch()
 
+    property var _activeXhr: null
+
     function request(url, done) {
+        if (_activeXhr) {
+            _activeXhr.onreadystatechange = null;
+            _activeXhr.abort();
+        }
         const xhr = new XMLHttpRequest();
+        _activeXhr = xhr;
+        xhr.timeout = 10000;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== XMLHttpRequest.DONE)
                 return;
+            if (_activeXhr === xhr)
+                _activeXhr = null;
             if (xhr.status !== 200) {
                 data.error = "Weather unavailable";
                 return;
@@ -77,6 +87,11 @@ Item {
                 + "&daily=weather_code,temperature_2m_max,temperature_2m_min"
                 + "&timezone=auto&forecast_days=6"
                 + (fahrenheit ? "&temperature_unit=fahrenheit&wind_speed_unit=mph" : ""), json => {
+            const d = json.daily, days = [];
+            for (let i = 0; i < d.time.length; i++)
+                days.push({ date: d.time[i], min: Math.round(d.temperature_2m_min[i]),
+                            max: Math.round(d.temperature_2m_max[i]), code: d.weather_code[i] });
+            data.daily = days;
             const c = json.current;
             data.current = {
                 temp: Math.round(c.temperature_2m),
@@ -87,11 +102,6 @@ Item {
                 code: c.weather_code,
                 isDay: c.is_day === 1
             };
-            const d = json.daily, days = [];
-            for (let i = 0; i < d.time.length; i++)
-                days.push({ date: d.time[i], min: Math.round(d.temperature_2m_min[i]),
-                            max: Math.round(d.temperature_2m_max[i]), code: d.weather_code[i] });
-            data.daily = days;
             data.error = "";
         });
     }
@@ -148,11 +158,11 @@ Item {
     }
 
     Timer {
-        interval: 15 * 60 * 1000
-        // only while a place is known
-        running: !isNaN(data.latitude) && !isNaN(data.longitude)
+        // retry after 1 min if geocoding/network failed at startup, otherwise refresh every 15 min
+        interval: !data.ready && data.city.trim().length > 0 ? 60 * 1000 : 15 * 60 * 1000
+        running: data.city.trim().length > 0
         repeat: true
-        onTriggered: data.fetch()
+        onTriggered: isNaN(data.latitude) || isNaN(data.longitude) ? data.geocode() : data.fetch()
     }
 
     Component.onCompleted: geocode()

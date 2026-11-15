@@ -8,6 +8,7 @@ import QtQuick.Layouts
 import org.kde.plasma.components as PC3
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.workspace.calendar as PlasmaCalendar
+import "shared" as Shared
 
 Item {
     id: popup
@@ -97,19 +98,25 @@ Item {
             PC3.Label {
                 Layout.leftMargin: Kirigami.Units.largeSpacing
                 text: popup.timeText(popup.now)
+                font.features: { "tnum": 1 }
                 opacity: 0.6
             }
             Item { Layout.fillWidth: true }
-            PC3.ToolButton {
+            Shared.GlassButton {
                 visible: calendar.month !== popup.now.getMonth() + 1 || calendar.year !== popup.now.getFullYear()
                 text: "Today"
+                iconSize: Kirigami.Units.iconSizes.small
+                isDark: popup.isDark
+                accent: popup.accent
                 onClicked: {
                     calendar.resetToToday();
                     popup.selected = new Date(popup.now.getFullYear(), popup.now.getMonth(), popup.now.getDate());
                 }
             }
-            PC3.ToolButton {
-                icon.name: "go-previous"
+            Shared.GlassButton {
+                iconName: "go-previous"
+                iconSize: Kirigami.Units.iconSizes.small
+                isDark: popup.isDark
                 onClicked: calendar.previousMonth()
             }
             PC3.Label {
@@ -117,8 +124,10 @@ Item {
                 color: popup.accent
                 font.weight: Font.Bold
             }
-            PC3.ToolButton {
-                icon.name: "go-next"
+            Shared.GlassButton {
+                iconName: "go-next"
+                iconSize: Kirigami.Units.iconSizes.small
+                isDark: popup.isDark
                 onClicked: calendar.nextMonth()
             }
         }
@@ -253,9 +262,11 @@ Item {
                                 height: width
                                 radius: width / 2
                                 color: day.isToday ? popup.accent
+                                     : day.isSelected ? Qt.rgba(popup.accent.r, popup.accent.g, popup.accent.b, popup.isDark ? 0.18 : 0.22)
                                      : dayArea.containsMouse ? Qt.rgba(1, 1, 1, popup.isDark ? 0.10 : 0.4) : "transparent"
                                 border.width: day.isSelected && !day.isToday ? 1.5 : 0
                                 border.color: popup.accent
+                                Behavior on color { ColorAnimation { duration: 100 } }
                             }
                             PC3.Label {
                                 anchors.centerIn: parent

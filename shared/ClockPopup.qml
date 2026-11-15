@@ -40,6 +40,7 @@ Item {
                 text: Qt.formatTime(popup.now, Qt.locale().timeFormat(Locale.ShortFormat))
                 font.pixelSize: Math.round(Kirigami.Theme.defaultFont.pixelSize * 3.4)
                 font.weight: Font.DemiBold
+                font.features: { "tnum": 1 }
             }
             PC3.Label {
                 Layout.alignment: Qt.AlignBottom
@@ -47,6 +48,7 @@ Item {
                 text: ":" + String(popup.now.getSeconds()).padStart(2, "0")
                 opacity: 0.5
                 font.pixelSize: Math.round(Kirigami.Theme.defaultFont.pixelSize * 1.3)
+                font.features: { "tnum": 1 }
             }
         }
 

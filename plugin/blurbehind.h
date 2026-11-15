@@ -41,11 +41,12 @@ private:
     void checkSceneRect();
     void scheduleApply();
     void apply();
-    void clear();
+    static void updateWindow(QQuickWindow *window);
 
     bool m_active = true;
     qreal m_radius = 0;
     QRectF m_lastRect;
+    QRegion m_region;
     QPointer<QQuickWindow> m_window;
     QTimer m_applyTimer;     // coalesces changes
     QTimer m_refreshTimer;   // re-applies after Plasma may have reset the region
