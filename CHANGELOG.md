@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.6.0-alpha.1
+
+New widgets
+- **Glasclock** for the top bar (or any panel): time and date in the bar, glass
+  calendar panel with month grid, ISO week, event cards, and automatic national
+  holiday region detection from the system time zone.
+
+Blur and themes
+- Real glass blur in the exact rounded shape of the bar and panels via the
+  included `org.glasdock.blur` C++ helper plugin (`KWindowEffects::enableBlurBehind`),
+  with multi-region union when multiple blur layers share a window and a frost
+  veil/grain slider on top of the blur; independent blur option for the launcher.
+- Explicit **Theme** setting (Follow system, Dark, Light) across Glasdock,
+  Glasplayer, Glasweather and Glasclock, decoupling the glass and text palette
+  from the system-wide Plasma color scheme.
+
+Dock and launcher
+- Dock separators: right-click any icon (or the apps button) to add or remove a
+  vertical separator after it; separators follow their icon when reordered.
+- Multi-window running indicator: pill width scales with open window count (2,
+  3+ windows) with per-segment separator ticks.
+- Steadier bar during hover: clamped zoom over the apps button, tighter
+  water-filling convergence (0 px horizontal drift), hover zoom restricted to
+  the glass bar bounds, and spare room reserved for newly opened apps.
+- Apps button no longer shows the hover name label above the bar.
+- Launcher polish: inner border sheen, category pill transitions, icon tile
+  hover highlight, and search input focus ring.
+
+Widgets and panels
+- **Weather badge icons**: 20 custom rounded-square SVG badges (10 WMO
+  conditions × day/night) for the dock tile, Glasweather and forecast rows.
+- **Glasplayer**: instant cover art loading via parallel YouTube HQ thumbnail
+  probing (`hqdefault`/`mqdefault`), Spotify Connect metadata fallback via
+  `pw-dump` and `oembed`, cover URL prefetching, and reliable app window
+  activation on Wayland via `TaskManager.TasksModel`.
+- Panels open closer to their widget (configurable gap) and support an
+  experimental morph animation growing out of the widget pill.
+
+Fixes
+- Live window preview stays open reliably when moving the cursor across dock
+  icons or into the preview card, and stops KWin screencasts as soon as hidden.
+- Fixed calendar selected day resetting every second when seconds are shown,
+  eliminated `FormLayout` QML scene warnings in settings pages, and cleaned up
+  redundant surface items and weather startup requests.
+
 ## 0.5.0-alpha.1
 
 New widgets
