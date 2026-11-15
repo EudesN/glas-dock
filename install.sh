@@ -20,7 +20,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-ALL=(glasdock glasplayer glasweather glasclock)
+ALL=(glasdock glasplayer glasweather glasclock glasdeskclock)
 widgets=()
 sync_only=false
 restart=false
