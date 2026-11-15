@@ -17,6 +17,8 @@ Item {
     readonly property bool playing: hasPlayer && player.playbackStatus === Mpris.PlaybackStatus.Playing
     readonly property real progress: hasPlayer && player.length > 0 ? Math.min(1, player.position / player.length) : 0
 
+    signal closeRequested()
+
     implicitWidth: Kirigami.Units.gridUnit * 22
     implicitHeight: layout.implicitHeight
 
@@ -97,13 +99,28 @@ Item {
                     height: seekArea.containsMouse || seekArea.pressed ? 6 : 4
                     radius: height / 2
                     color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
-                    Behavior on height { NumberAnimation { duration: 100 } }
+                    Behavior on height { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
                     Rectangle {
+                        id: fillBar
                         width: parent.width * popup.progress
                         height: parent.height
                         radius: parent.radius
                         color: popup.accent
+                    }
+
+                    Rectangle {
+                        width: 12
+                        height: 12
+                        radius: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: Math.max(0, Math.min(parent.width - width, fillBar.width - width / 2))
+                        color: "white"
+                        border.width: 2
+                        border.color: popup.accent
+                        scale: (seekArea.containsMouse || seekArea.pressed) && seekArea.enabled ? 1 : 0
+                        visible: scale > 0
+                        Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
                     }
                 }
 
@@ -113,16 +130,20 @@ Item {
                     hoverEnabled: true
                     enabled: popup.hasPlayer && popup.player.canSeek
                     function seek(mx) {
-                        popup.player.position = Math.max(0, Math.min(1, mx / width)) * popup.player.length;
+                        const pos = Math.max(0, Math.min(1, mx / width)) * popup.player.length;
+                        if (popup.player.seekTo)
+                            popup.player.seekTo(pos);
+                        else
+                            popup.player.position = pos;
                     }
                     onPressed: mouse => seek(mouse.x)
                     onPositionChanged: mouse => { if (pressed) seek(mouse.x); }
                 }
             }
             RowLayout {
-                PC3.Label { text: popup.hasPlayer ? popup.fmt(popup.player.position) : ""; font: Kirigami.Theme.smallFont; opacity: 0.6 }
+                PC3.Label { text: popup.hasPlayer ? popup.fmt(popup.player.position) : ""; font.pointSize: Kirigami.Theme.smallFont.pointSize; font.features: { "tnum": 1 }; opacity: 0.6 }
                 Item { Layout.fillWidth: true }
-                PC3.Label { text: popup.hasPlayer ? popup.fmt(popup.player.length) : ""; font: Kirigami.Theme.smallFont; opacity: 0.6 }
+                PC3.Label { text: popup.hasPlayer ? popup.fmt(popup.player.length) : ""; font.pointSize: Kirigami.Theme.smallFont.pointSize; font.features: { "tnum": 1 }; opacity: 0.6 }
             }
         }
 
@@ -135,7 +156,7 @@ Item {
                 iconName: "media-skip-backward"
                 isDark: popup.isDark
                 enabled: popup.hasPlayer && popup.player.canGoPrevious
-                onClicked: popup.player.Previous()
+                onClicked: popup.player.previous()
             }
             GlassButton {
                 iconName: popup.playing ? "media-playback-pause" : "media-playback-start"
@@ -144,13 +165,13 @@ Item {
                 accent: popup.accent
                 isDark: popup.isDark
                 enabled: popup.hasPlayer
-                onClicked: popup.player.PlayPause()
+                onClicked: popup.player.playPause()
             }
             GlassButton {
                 iconName: "media-skip-forward"
                 isDark: popup.isDark
                 enabled: popup.hasPlayer && popup.player.canGoNext
-                onClicked: popup.player.Next()
+                onClicked: popup.player.next()
             }
         }
 
@@ -161,7 +182,10 @@ Item {
             text: popup.hasPlayer ? "Open " + popup.player.identity : ""
             iconSize: Kirigami.Units.iconSizes.small
             isDark: popup.isDark
-            onClicked: popup.player.Raise()
+            onClicked: {
+                popup.player.raise();
+                popup.closeRequested();
+            }
         }
     }
 }

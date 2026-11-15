@@ -58,13 +58,6 @@ KCM.SimpleKCM {
             id: centeredZoom
             text: "Keep the dock centered while zooming"
         }
-        QQC2.Label {
-            Layout.maximumWidth: Kirigami.Units.gridUnit * 22
-            wrapMode: Text.WordWrap
-            font: Kirigami.Theme.smallFont
-            opacity: 0.7
-            text: "Zoom and names are off in the Blur style (see Appearance)."
-        }
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
             Kirigami.FormData.label: "Notifications"

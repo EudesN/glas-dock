@@ -11,6 +11,7 @@ KCM.SimpleKCM {
     property alias cfg_showClock: showClock.checked
     property alias cfg_weatherCity: weatherCity.text
     property alias cfg_weatherFahrenheit: weatherFahrenheit.checked
+    property alias cfg_weatherBadges: weatherBadges.checked
 
     Kirigami.FormLayout {
         Kirigami.Separator {
@@ -44,6 +45,11 @@ KCM.SimpleKCM {
             id: weatherFahrenheit
             enabled: showWeather.checked
             text: "Use Fahrenheit"
+        }
+        QQC2.CheckBox {
+            id: weatherBadges
+            enabled: showWeather.checked
+            text: "Glasdock badge icons (otherwise the icon theme's)"
         }
         QQC2.Label {
             Layout.maximumWidth: Kirigami.Units.gridUnit * 22

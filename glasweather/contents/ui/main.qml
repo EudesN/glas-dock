@@ -20,13 +20,13 @@ PlasmoidItem {
         id: weatherSource
         city: root.cfg.city
         fahrenheit: root.cfg.fahrenheit
+        useBadges: root.cfg.iconBadges
     }
     readonly property bool ready: weatherSource.ready
 
-    readonly property bool isDark: Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.backgroundColor) === Kirigami.ColorUtils.Dark
-    readonly property color accent: isDark
-        && Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.highlightColor) === Kirigami.ColorUtils.Dark
-        ? Qt.lighter(Kirigami.Theme.highlightColor, 1.5) : Kirigami.Theme.highlightColor
+    Shared.ThemeScope { id: themeScope; target: null; themeMode: root.cfg.themeMode }
+    readonly property bool isDark: themeScope.isDark
+    readonly property color accent: themeScope.accent
 
     preferredRepresentation: fullRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
@@ -36,6 +36,7 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: compact
 
+        Shared.ThemeScope { target: compact; themeMode: root.cfg.themeMode }
         readonly property real pad: Math.round(height * 0.12)
 
         Layout.preferredWidth: row.implicitWidth + pad * (root.cfg.pillBackground ? 4 : 2)
@@ -89,13 +90,18 @@ PlasmoidItem {
             id: popup
             anchorItem: compact
             edge: Plasmoid.location
+            gap: root.cfg.popupGap
+            morph: root.cfg.popupMorph
             screenGeometry: Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0)
             style: root.cfg.popupStyle
             backgroundOpacity: root.cfg.popupOpacity
             radius: root.cfg.popupRadius
+            themeMode: root.cfg.themeMode
             isDark: root.isDark
             accent: root.accent
             animated: root.cfg.popupAnimation
+            blurBehind: root.cfg.popupBlur || root.cfg.popupStyle === 4
+            frost: root.cfg.popupFrost
             sourceComponent: Shared.WeatherPopup {
                 weather: weatherSource
                 accent: root.accent

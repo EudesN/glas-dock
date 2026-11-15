@@ -40,6 +40,7 @@ Item {
                 text: Qt.formatTime(popup.now, Qt.locale().timeFormat(Locale.ShortFormat))
                 font.pixelSize: Math.round(Kirigami.Theme.defaultFont.pixelSize * 3.4)
                 font.weight: Font.DemiBold
+                font.features: { "tnum": 1 }
             }
             PC3.Label {
                 Layout.alignment: Qt.AlignBottom
@@ -47,6 +48,7 @@ Item {
                 text: ":" + String(popup.now.getSeconds()).padStart(2, "0")
                 opacity: 0.5
                 font.pixelSize: Math.round(Kirigami.Theme.defaultFont.pixelSize * 1.3)
+                font.features: { "tnum": 1 }
             }
         }
 
@@ -94,9 +96,9 @@ Item {
                     implicitWidth: chip.implicitWidth + Kirigami.Units.largeSpacing * 2
                     implicitHeight: chip.implicitHeight + Kirigami.Units.smallSpacing * 2
                     radius: height / 2
-                    color: popup.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.4)
+                    color: popup.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.50)
                     border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, popup.isDark ? 0.10 : 0.45)
+                    border.color: popup.isDark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.08)
                     PC3.Label { id: chip; anchors.centerIn: parent; text: modelData; font: Kirigami.Theme.smallFont }
                 }
             }

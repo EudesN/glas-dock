@@ -28,6 +28,7 @@ PlasmaCore.Dialog {
     property int style: 0
     property real backgroundOpacity: 0.8
     property real radius: 22
+    property int themeMode: 0
     property bool isDark: true
     property color accent: Kirigami.Theme.highlightColor
     property real accentTint: 0
@@ -35,7 +36,8 @@ PlasmaCore.Dialog {
     property bool showShadow: true
 
     readonly property bool hovered: frameHover.hovered
-    readonly property bool themeBlur: style === 4
+    property bool blurBehind: false
+    property real frost: 0
 
     signal activateRequested(int row, int child)
     signal closeRequested(int row, int child)
@@ -43,7 +45,7 @@ PlasmaCore.Dialog {
     type: PlasmaCore.Dialog.Tooltip
     flags: Qt.WindowDoesNotAcceptFocus | Qt.WindowStaysOnTopHint
     location: PlasmaCore.Types.Floating
-    backgroundHints: themeBlur ? PlasmaCore.Dialog.StandardBackground : PlasmaCore.Dialog.NoBackground
+    backgroundHints: PlasmaCore.Dialog.NoBackground
     hideOnWindowDeactivate: false
     visible: false
 
@@ -52,8 +54,7 @@ PlasmaCore.Dialog {
     onHeightChanged: if (visible) reposition()
 
     function reposition() {
-        const w = frame.width + (themeBlur ? margins.left + margins.right : 0);
-        const h = frame.height + (themeBlur ? margins.top + margins.bottom : 0);
+        const w = frame.width, h = frame.height;
         const m = frame.shadowMargin;
         let nx = Math.round(anchorX - w / 2);
         const g = screenGeometry;
@@ -62,17 +63,27 @@ PlasmaCore.Dialog {
             nx = Math.max(g.x + margin - m, Math.min(g.x + g.width - margin + m - w, nx));
         }
         x = nx;
-        y = Math.round(anchorTop - gap - h + m);
+        y = Math.round(anchorTop - gap - h + frame.bottomShadowMargin);
     }
 
     mainItem: Item {
         id: frame
-        readonly property int shadowMargin: preview.themeBlur ? 0 : 28
+        Widgets.ThemeScope { target: frame; themeMode: preview.themeMode }
+        readonly property int shadowMargin: 28
+        readonly property int bottomShadowMargin: gap
         readonly property int padding: Kirigami.Units.largeSpacing
         readonly property int columns: Math.min(Math.max(1, preview.windows.length), 4)
+        readonly property int rows: Math.max(1, Math.ceil(preview.windows.length / columns))
+        // card size computed directly (the Grid only lays out once the window
+        // is shown, and the window must have its final size before that)
+        readonly property real cardWidth: preview.thumbWidth + Kirigami.Units.smallSpacing * 2
+        readonly property real cardHeight: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+                                         + Math.round(preview.thumbWidth * 0.62) + Kirigami.Units.smallSpacing * 3
+        readonly property real cardsWidth: columns * cardWidth + (columns - 1) * Kirigami.Units.smallSpacing
+        readonly property real cardsHeight: rows * cardHeight + (rows - 1) * Kirigami.Units.smallSpacing
 
-        width: cards.width + (padding + shadowMargin) * 2
-        height: cards.height + (padding + shadowMargin) * 2
+        width: cardsWidth + (padding + shadowMargin) * 2
+        height: cardsHeight + padding * 2 + shadowMargin + bottomShadowMargin
 
         function fadeIn() {
             panel.opacity = 0;
@@ -85,13 +96,16 @@ PlasmaCore.Dialog {
             NumberAnimation { target: panel; property: "scale"; to: 1; duration: Kirigami.Units.shortDuration * 1.6; easing.type: Easing.OutCubic }
         }
 
-        HoverHandler { id: frameHover }
-
         Item {
             id: panel
             anchors.fill: parent
-            anchors.margins: frame.shadowMargin
+            anchors.topMargin: frame.shadowMargin
+            anchors.leftMargin: frame.shadowMargin
+            anchors.rightMargin: frame.shadowMargin
+            anchors.bottomMargin: frame.bottomShadowMargin
             transformOrigin: Item.Bottom
+
+            HoverHandler { id: frameHover }
 
             Widgets.GlassSurface {
                 anchors.fill: parent
@@ -104,6 +118,8 @@ PlasmaCore.Dialog {
                 showBorder: preview.showBorder
                 showShadow: preview.showShadow
                 forceBody: true
+                blurBehind: preview.blurBehind
+                frost: preview.frost
             }
 
             Grid {
@@ -120,15 +136,20 @@ PlasmaCore.Dialog {
                         required property var modelData
                         readonly property real thumbHeight: Math.round(preview.thumbWidth * 0.62)
 
-                        width: preview.thumbWidth + Kirigami.Units.smallSpacing * 2
-                        height: header.height + thumbHeight + Kirigami.Units.smallSpacing * 3
+                        width: frame.cardWidth
+                        height: frame.cardHeight
                         radius: Math.round(preview.radius * 0.6)
                         color: cardArea.containsMouse
-                            ? (preview.isDark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.55))
-                            : "transparent"
-                        border.width: cardArea.containsMouse ? 1 : 0
-                        border.color: Qt.rgba(preview.accent.r, preview.accent.g, preview.accent.b, 0.6)
-                        Behavior on color { ColorAnimation { duration: 100 } }
+                            ? (preview.isDark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(1, 1, 1, 0.60))
+                            : card.modelData.active
+                            ? (preview.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.42))
+                            : (preview.isDark ? Qt.rgba(1, 1, 1, 0.04) : Qt.rgba(1, 1, 1, 0.26))
+                        border.width: 1
+                        border.color: cardArea.containsMouse || card.modelData.active
+                            ? Qt.rgba(preview.accent.r, preview.accent.g, preview.accent.b, cardArea.containsMouse ? 0.72 : 0.42)
+                            : Qt.rgba(1, 1, 1, preview.isDark ? 0.08 : 0.35)
+                        Behavior on color { ColorAnimation { duration: 110 } }
+                        Behavior on border.color { ColorAnimation { duration: 110 } }
 
                         MouseArea {
                             id: cardArea
@@ -161,19 +182,23 @@ PlasmaCore.Dialog {
                                 Layout.fillWidth: true
                                 text: card.modelData.title
                                 elide: Text.ElideRight
-                                font: Kirigami.Theme.smallFont
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                font.weight: card.modelData.active ? Font.DemiBold : Font.Normal
                             }
                             Rectangle {
                                 Layout.preferredWidth: Kirigami.Units.iconSizes.small + 4
                                 Layout.preferredHeight: Kirigami.Units.iconSizes.small + 4
                                 radius: width / 2
                                 visible: cardArea.containsMouse || closeArea.containsMouse
-                                color: closeArea.containsMouse ? "#e5484d" : Qt.rgba(1, 1, 1, 0.12)
+                                color: closeArea.containsMouse ? "#e5484d"
+                                    : (preview.isDark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.08))
                                 Kirigami.Icon {
                                     anchors.centerIn: parent
                                     width: Kirigami.Units.iconSizes.small - 4
                                     height: width
                                     source: "window-close"
+                                    isMask: closeArea.containsMouse
+                                    color: closeArea.containsMouse ? "white" : Kirigami.Theme.textColor
                                 }
                                 MouseArea {
                                     id: closeArea

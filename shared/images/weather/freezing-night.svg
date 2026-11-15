@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3D5677"/>
+      <stop offset="1" stop-color="#18243A"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="128" height="128" rx="30" ry="30" fill="url(#sky)"/>
+  <rect x="0" y="0" width="128" height="128" rx="30" ry="30" fill="url(#shine)"/>
+  <circle cx="49.6" cy="40.3" r="14.4" fill="#FFFFFF" opacity="1.0"/>
+  <circle cx="69.8" cy="33.9" r="18.7" fill="#FFFFFF" opacity="1.0"/>
+  <circle cx="85.6" cy="46.8" r="10.8" fill="#FFFFFF" opacity="1.0"/>
+  <rect x="28.0" y="39.0" width="72.0" height="25.9" rx="13.0" ry="13.0" fill="#FFFFFF" opacity="1.0"/>
+  <line x1="48" y1="76" x2="43" y2="94" stroke="#8ED0FF" stroke-width="6" stroke-linecap="round"/>
+  <line x1="80" y1="76" x2="75" y2="94" stroke="#8ED0FF" stroke-width="6" stroke-linecap="round"/>
+  <line x1="57.0" y1="92.0" x2="71.0" y2="92.0" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="60.5" y1="85.9" x2="67.5" y2="98.1" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="67.5" y1="85.9" x2="60.5" y2="98.1" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/>
+</svg>

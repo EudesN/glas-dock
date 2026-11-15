@@ -9,6 +9,9 @@ Item {
     id: data
 
     property string city: ""
+    // Glasdock's own badge icons (shared/images/weather) instead of the
+    // icon theme's weather icons
+    property bool useBadges: true
     property bool fahrenheit: false
 
     property string place: ""
@@ -16,17 +19,27 @@ Item {
     property real longitude: NaN
     property var current: null    // { temp, feels, humidity, wind, code, isDay }
     property var daily: []        // [{ date, min, max, code }]
-    property string error: ""
+    property string error: "Set a city in the settings"
     readonly property bool ready: current !== null
 
     onCityChanged: geocode()
-    onFahrenheitChanged: fetch()
+    onFahrenheitChanged: if (ready) fetch()
+
+    property var _activeXhr: null
 
     function request(url, done) {
+        if (_activeXhr) {
+            _activeXhr.onreadystatechange = null;
+            _activeXhr.abort();
+        }
         const xhr = new XMLHttpRequest();
+        _activeXhr = xhr;
+        xhr.timeout = 10000;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== XMLHttpRequest.DONE)
                 return;
+            if (_activeXhr === xhr)
+                _activeXhr = null;
             if (xhr.status !== 200) {
                 data.error = "Weather unavailable";
                 return;
@@ -74,6 +87,11 @@ Item {
                 + "&daily=weather_code,temperature_2m_max,temperature_2m_min"
                 + "&timezone=auto&forecast_days=6"
                 + (fahrenheit ? "&temperature_unit=fahrenheit&wind_speed_unit=mph" : ""), json => {
+            const d = json.daily, days = [];
+            for (let i = 0; i < d.time.length; i++)
+                days.push({ date: d.time[i], min: Math.round(d.temperature_2m_min[i]),
+                            max: Math.round(d.temperature_2m_max[i]), code: d.weather_code[i] });
+            data.daily = days;
             const c = json.current;
             data.current = {
                 temp: Math.round(c.temperature_2m),
@@ -84,17 +102,33 @@ Item {
                 code: c.weather_code,
                 isDay: c.is_day === 1
             };
-            const d = json.daily, days = [];
-            for (let i = 0; i < d.time.length; i++)
-                days.push({ date: d.time[i], min: Math.round(d.temperature_2m_min[i]),
-                            max: Math.round(d.temperature_2m_max[i]), code: d.weather_code[i] });
-            data.daily = days;
             data.error = "";
         });
     }
 
-    // WMO weather code -> Breeze icon name
+    // WMO weather code -> condition used by the badge set
+    function badgeKind(code) {
+        if (code === 0) return "clear";
+        if (code === 1 || code === 2) return "partly";
+        if (code === 3) return "cloudy";
+        if (code === 45 || code === 48) return "fog";
+        if (code >= 51 && code <= 57) return "drizzle";
+        if ((code >= 61 && code <= 65) || (code >= 80 && code <= 82)) return "rain";
+        if (code === 66 || code === 67) return "freezing";
+        if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "snow";
+        if (code >= 95) return "storm";
+        return "unknown";
+    }
+
+    // icon for a WMO code: a badge image, or a Breeze icon name
     function iconFor(code, isDay) {
+        if (useBadges)
+            return Qt.resolvedUrl("images/weather/" + badgeKind(code) + (isDay === false ? "-night" : "-day") + ".svg");
+        return themeIconFor(code, isDay);
+    }
+
+    // WMO weather code -> Breeze icon name
+    function themeIconFor(code, isDay) {
         const n = isDay === false ? "-night" : "";
         if (code === 0) return "weather-clear" + n;
         if (code === 1 || code === 2) return "weather-few-clouds" + n;
@@ -124,12 +158,10 @@ Item {
     }
 
     Timer {
-        interval: 15 * 60 * 1000
-        // only while a place is known
-        running: !isNaN(data.latitude) && !isNaN(data.longitude)
+        // retry after 1 min if geocoding/network failed at startup, otherwise refresh every 15 min
+        interval: !data.ready && data.city.trim().length > 0 ? 60 * 1000 : 15 * 60 * 1000
+        running: data.city.trim().length > 0
         repeat: true
-        onTriggered: data.fetch()
+        onTriggered: isNaN(data.latitude) || isNaN(data.longitude) ? data.geocode() : data.fetch()
     }
-
-    Component.onCompleted: geocode()
 }

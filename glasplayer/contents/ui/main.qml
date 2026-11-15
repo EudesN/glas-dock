@@ -28,11 +28,9 @@ PlasmoidItem {
                                     ? Plasmoid.containment.corona.editMode === true : false
     readonly property bool hidden: idle && cfg.hideWhenIdle && !editing
 
-    // on dark themes, dark accent colors are lifted a bit (same rule as the dock)
-    readonly property bool isDark: Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.backgroundColor) === Kirigami.ColorUtils.Dark
-    readonly property color accent: isDark
-        && Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.highlightColor) === Kirigami.ColorUtils.Dark
-        ? Qt.lighter(Kirigami.Theme.highlightColor, 1.5) : Kirigami.Theme.highlightColor
+    Shared.ThemeScope { id: themeScope; target: null; themeMode: root.cfg.themeMode }
+    readonly property bool isDark: themeScope.isDark
+    readonly property color accent: themeScope.accent
 
     preferredRepresentation: fullRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
@@ -43,6 +41,7 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: compact
 
+        Shared.ThemeScope { target: compact; themeMode: root.cfg.themeMode }
         readonly property bool collapsed: root.hidden
         readonly property real pad: Math.round(height * 0.12)
 
@@ -76,7 +75,7 @@ PlasmoidItem {
             acceptedButtons: Qt.LeftButton | Qt.MiddleButton
             onClicked: mouse => {
                 if (mouse.button === Qt.MiddleButton && root.hasPlayer)
-                    root.player.PlayPause();
+                    root.player.playPause();
                 else
                     popup.toggle();
             }
@@ -84,8 +83,8 @@ PlasmoidItem {
                 // scroll to skip tracks
                 if (!root.hasPlayer)
                     return;
-                if (wheel.angleDelta.y > 0 && root.player.canGoPrevious) root.player.Previous();
-                else if (wheel.angleDelta.y < 0 && root.player.canGoNext) root.player.Next();
+                if (wheel.angleDelta.y > 0 && root.player.canGoPrevious) root.player.previous();
+                else if (wheel.angleDelta.y < 0 && root.player.canGoNext) root.player.next();
             }
         }
 
@@ -149,9 +148,9 @@ PlasmoidItem {
                             hoverEnabled: true
                             enabled: ctl.enabledNow
                             onClicked: {
-                                if (ctl.modelData === "prev") root.player.Previous();
-                                else if (ctl.modelData === "next") root.player.Next();
-                                else root.player.PlayPause();
+                                if (ctl.modelData === "prev") root.player.previous();
+                                else if (ctl.modelData === "next") root.player.next();
+                                else root.player.playPause();
                             }
                         }
                     }
@@ -163,17 +162,23 @@ PlasmoidItem {
             id: popup
             anchorItem: compact
             edge: Plasmoid.location
+            gap: root.cfg.popupGap
+            morph: root.cfg.popupMorph
             screenGeometry: Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0)
             style: root.cfg.popupStyle
             backgroundOpacity: root.cfg.popupOpacity
             radius: root.cfg.popupRadius
+            themeMode: root.cfg.themeMode
             isDark: root.isDark
             accent: root.accent
             animated: root.cfg.popupAnimation
+            blurBehind: root.cfg.popupBlur || root.cfg.popupStyle === 4
+            frost: root.cfg.popupFrost
             sourceComponent: Shared.PlayerPopup {
                 player: root.player
                 accent: root.accent
                 isDark: root.isDark
+                onCloseRequested: popup.close()
             }
         }
     }

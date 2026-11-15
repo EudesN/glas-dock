@@ -8,6 +8,7 @@ plain QML plasmoids.
 | **Glasdock** (`glasdock/`) | The dock: icon zoom, glass bar, launcher, badges, optional player/weather/clock tiles |
 | **Glasplayer** (`glasplayer/`) | Media player for any panel (e.g. the top bar): cover, title, play/pause, glass panel with controls |
 | **Glasweather** (`glasweather/`) | Weather for any panel: icon and temperature, glass panel with a 5-day forecast |
+| **Glasclock** (`glasclock/`) | Clock and date for any panel, glass panel with the day's events and the month |
 
 All of them share the same glass look and code (`shared/`).
 
@@ -58,6 +59,8 @@ shared/        code used by every widget (glass surface, panels, player/weather 
 glasdock/      the dock
 glasplayer/    panel media player
 glasweather/   panel weather
+glasclock/     panel clock and calendar
+plugin/        blur helper (C++ QML module, built by install.sh)
 install.sh     syncs shared/ into each widget and installs/updates it
 tools/         development helpers
 ```
@@ -68,11 +71,11 @@ and seeking work).
 
 ## Known limitations
 
-- The launcher's custom glass background cannot blur the desktop behind it
-  (QML has no API for KWin blur). The theme background keeps the blur.
+- Real blur behind the glass requires the included `org.glasdock.blur` C++
+  helper plugin (built automatically by `install.sh` when Qt 6 and KF6
+  WindowSystem development headers are installed) and KWin's *Blur* effect enabled.
 - Badges count unread notifications only; app-provided counters (Unity
   LauncherEntry, used by Telegram/Discord) are not read yet.
-- No real blur behind the dock (QML has no API for KWin blur).
 - Horizontal panels only.
 
 ## License
