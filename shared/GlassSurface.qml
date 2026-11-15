@@ -97,40 +97,32 @@ Item {
         shadow.color: Qt.rgba(0, 0, 0, surface.isDark ? 0.48 : 0.22)
     }
 
-    // frosted: milky veil + fine grain
+    // frosted / blur-frost: milky veil + fine grain (single pass even when both are active)
+    readonly property real veilAlpha: {
+        const f = surface.isFrosted ? (surface.isDark ? 0.06 : 0.20) : 0;
+        const b = surface.frostNow * (surface.isDark ? 0.14 : 0.45);
+        return Math.min(1, f + b);
+    }
+    readonly property real grainAlpha: {
+        const f = surface.isFrosted ? (surface.isDark ? 0.55 : 0.80) : 0;
+        const b = surface.frostNow * (surface.isDark ? 0.50 : 0.70);
+        return Math.min(1, Math.max(f, b));
+    }
     Rectangle {
-        visible: surface.isFrosted
+        visible: surface.needsGrain
         anchors.fill: parent
         anchors.margins: 1
         radius: surface.innerR
-        color: Qt.rgba(1, 1, 1, surface.isDark ? 0.06 : 0.20)
+        color: surface.isDark ? Qt.rgba(0.88, 0.88, 0.92, surface.veilAlpha)
+                              : Qt.rgba(1, 1, 1, surface.veilAlpha)
     }
     Kirigami.ShadowedTexture {
-        visible: surface.isFrosted
+        visible: surface.needsGrain
         anchors.fill: parent
         anchors.margins: 1
         radius: surface.innerR
         color: "transparent"
-        opacity: surface.isDark ? 0.55 : 0.8
-        source: grainSource
-    }
-
-    // frost veil (blur look): milky layer + grain, amount = frost
-    Rectangle {
-        visible: surface.frostNow > 0
-        anchors.fill: parent
-        anchors.margins: 1
-        radius: surface.innerR
-        color: surface.isDark ? Qt.rgba(0.85, 0.85, 0.9, surface.frostNow * 0.14)
-                              : Qt.rgba(1, 1, 1, surface.frostNow * 0.45)
-    }
-    Kirigami.ShadowedTexture {
-        visible: surface.frostNow > 0
-        anchors.fill: parent
-        anchors.margins: 1
-        radius: surface.innerR
-        color: "transparent"
-        opacity: surface.frostNow * (surface.isDark ? 0.5 : 0.7)
+        opacity: surface.grainAlpha
         source: grainSource
     }
 

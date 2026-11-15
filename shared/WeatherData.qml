@@ -19,11 +19,11 @@ Item {
     property real longitude: NaN
     property var current: null    // { temp, feels, humidity, wind, code, isDay }
     property var daily: []        // [{ date, min, max, code }]
-    property string error: ""
+    property string error: "Set a city in the settings"
     readonly property bool ready: current !== null
 
     onCityChanged: geocode()
-    onFahrenheitChanged: fetch()
+    onFahrenheitChanged: if (ready) fetch()
 
     property var _activeXhr: null
 
@@ -164,6 +164,4 @@ Item {
         repeat: true
         onTriggered: isNaN(data.latitude) || isNaN(data.longitude) ? data.geocode() : data.fetch()
     }
-
-    Component.onCompleted: geocode()
 }

@@ -144,7 +144,8 @@ PlasmoidItem {
     property date now: new Date()
     Timer {
         // every second only while the clock panel is open; otherwise on the minute
-        interval: (root.dockItem && root.dockItem.clockPopupOpen) ? 1000 : (60 - root.now.getSeconds()) * 1000
+        interval: (root.dockItem && root.dockItem.clockPopupOpen)
+            ? 1000 : Math.max(1000, (60 - root.now.getSeconds()) * 1000 - root.now.getMilliseconds() + 50)
         repeat: true
         running: Plasmoid.configuration.showClock
         triggeredOnStart: true
@@ -486,17 +487,34 @@ PlasmoidItem {
 
         // --- mouse tracking and zoom amount (0..1, animated)
         property real mouseX: -100000
-        property real zoom: hover.hovered && !contextMenuOpen ? 1 : 0
+        property bool pointerOverBar: false
+        property real zoom: (pointerOverBar || dragging) && !contextMenuOpen ? 1 : 0
         property bool contextMenuOpen: false
         Behavior on zoom {
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
         }
 
+        function updatePointerOverBar() {
+            if (!hover.hovered) {
+                pointerOverBar = false;
+                return;
+            }
+            const top = zoom > 0.01 ? dock.barY - (dock.iconMax - dock.baseIcon) - 2 : dock.barY - 2;
+            const inside = hover.px >= glass.x && hover.px <= glass.x + glass.width
+                && hover.py >= top && hover.py <= dock.height;
+            pointerOverBar = inside;
+            if (inside && !dock.dragging)
+                dock.mouseX = hover.px;
+        }
+
         HoverHandler {
             id: hover
             readonly property real px: point.position.x
+            readonly property real py: point.position.y
             // while dragging, mouseX is driven by the (clamped) drag position
-            onPxChanged: if (hovered && !dock.dragging) dock.mouseX = px
+            onPxChanged: dock.updatePointerOverBar()
+            onPyChanged: dock.updatePointerOverBar()
+            onHoveredChanged: dock.updatePointerOverBar()
         }
 
         // --- layout: size and position of each icon
@@ -542,17 +560,17 @@ PlasmoidItem {
                     if (zoomable(i))
                         target += b * z * g(Math.abs(mid - center(i)));
                 const cap = b * z;
-                for (let pass = 0; pass < 6; pass++) {
+                for (let pass = 0; pass < 16; pass++) {
                     let capped = 0, free = 0;
                     for (let i = 0; i < n; i++) {
-                        if (extras[i] >= cap - 0.001) capped += extras[i];
+                        if (extras[i] >= cap - 1e-6) capped += extras[i];
                         else free += extras[i];
                     }
-                    if (free <= 0 || Math.abs(target - capped - free) < 0.05)
+                    if (free <= 1e-9 || Math.abs(target - capped - free) < 0.0005)
                         break;
                     const k = (target - capped) / free;
                     for (let i = 0; i < n; i++)
-                        if (extras[i] < cap - 0.001)
+                        if (extras[i] < cap - 1e-6)
                             extras[i] = Math.min(cap, extras[i] * k);
                 }
                 sumE = 0;
@@ -694,6 +712,7 @@ PlasmoidItem {
                     if (mouse.button === Qt.RightButton) {
                         dock.hidePreview();
                         appsMenu.openRelative();
+                        dock.contextMenuOpen = true;
                     } else {
                         dock.toggleLauncher();
                     }
@@ -704,6 +723,7 @@ PlasmoidItem {
                 id: appsMenu
                 visualParent: appsButton
                 placement: PlasmaExtras.Menu.TopPosedLeftAlignedPopup
+                onStatusChanged: if (status === PlasmaExtras.Menu.Closed) dock.contextMenuOpen = false
                 PlasmaExtras.MenuItem {
                     readonly property bool has: dock.hasSeparatorAfter("@apps")
                     text: has ? "Remove Separator After" : "Add Separator After"
@@ -739,6 +759,7 @@ PlasmoidItem {
                 launcherView.playClose();
                 return;
             }
+            hidePreview();
             launcherView.reset();
             launcher.visible = true;
             launcher.reposition();
@@ -764,8 +785,8 @@ PlasmoidItem {
             onVisibleChanged: {
                 if (!visible)
                     dock.launcherHiddenAt = Date.now();
-                Plasmoid.status = visible ? PlasmaCore.Types.RequiresAttentionStatus
-                                          : PlasmaCore.Types.ActiveStatus;
+                Plasmoid.status = visible || widgetPopup.visible ? PlasmaCore.Types.RequiresAttentionStatus
+                                                                 : PlasmaCore.Types.ActiveStatus;
             }
             onWidthChanged: if (visible) reposition()
             onHeightChanged: if (visible) reposition()
@@ -909,6 +930,7 @@ PlasmoidItem {
             }
             if (launcher.visible)
                 launcherView.playClose();
+            hidePreview();
             widgetPopupAnchor = anchorItem;
             widgetPopupLoader.sourceComponent = component;
             widgetPopup.reposition();

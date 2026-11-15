@@ -125,12 +125,11 @@ KCM.SimpleKCM {
             wrapMode: Text.WordWrap
             font: Kirigami.Theme.smallFont
             opacity: 0.7
-            text: blurProbe.status === Loader.Error
+            readonly property bool blurInstalled: Qt.createComponent(Qt.resolvedUrl("shared/BlurLayer.qml")).status === Component.Ready
+            text: !blurInstalled
                 ? "The blur helper is not installed: run ./install.sh from the Glasdock folder, then log out and back in once."
                 : "Frost adds a milky, grainy layer over the blur. How strongly KWin blurs is a system-wide setting: Desktop Effects → Blur. Lower the opacity to see more of the blur."
         }
-        // probes whether the helper plugin can be loaded
-        Loader { id: blurProbe; visible: false; source: Qt.resolvedUrl("shared/BlurLayer.qml") }
         P5Support.DataSource {
             id: runner
             engine: "executable"

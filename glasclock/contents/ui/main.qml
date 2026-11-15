@@ -22,7 +22,8 @@ PlasmoidItem {
     property date now: new Date()
     Timer {
         // every second when seconds are shown, otherwise on the minute
-        interval: root.cfg.showSeconds ? 1000 : (60 - root.now.getSeconds()) * 1000
+        interval: root.cfg.showSeconds
+            ? 1000 : Math.max(1000, (60 - root.now.getSeconds()) * 1000 - root.now.getMilliseconds() + 50)
         running: true
         repeat: true
         triggeredOnStart: true

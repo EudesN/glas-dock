@@ -197,6 +197,8 @@ PlasmaCore.Dialog {
                                     width: Kirigami.Units.iconSizes.small - 4
                                     height: width
                                     source: "window-close"
+                                    isMask: closeArea.containsMouse
+                                    color: closeArea.containsMouse ? "white" : Kirigami.Theme.textColor
                                 }
                                 MouseArea {
                                     id: closeArea

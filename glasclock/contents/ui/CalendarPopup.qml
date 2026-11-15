@@ -19,7 +19,13 @@ Item {
     property var eventPluginsManager: null
     property var timeText: d => Qt.formatTime(d, Qt.locale().timeFormat(Locale.ShortFormat))
 
-    property date selected: new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    readonly property int dayStamp: now.getFullYear() * 10000 + now.getMonth() * 100 + now.getDate()
+    readonly property date todayDate: {
+        dayStamp;
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+    property date selected: todayDate
+    onTodayDateChanged: selected = todayDate
     property int revision: 0          // bumped when the agenda changes
 
     readonly property color dim: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.45)
@@ -45,9 +51,9 @@ Item {
         days: 7
         weeks: 6
         firstDayOfWeek: Qt.locale().firstDayOfWeek
-        today: popup.now
+        today: popup.todayDate
         Component.onCompleted: {
-            displayedDate = popup.now;
+            displayedDate = popup.todayDate;
             if (popup.eventPluginsManager)
                 daysModel.setPluginsManager(popup.eventPluginsManager);
         }

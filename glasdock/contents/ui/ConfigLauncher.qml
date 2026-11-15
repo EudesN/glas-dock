@@ -88,11 +88,11 @@ KCM.SimpleKCM {
             wrapMode: Text.WordWrap
             font: Kirigami.Theme.smallFont
             opacity: 0.7
-            text: blurProbe.status === Loader.Error
+            readonly property bool blurInstalled: Qt.createComponent(Qt.resolvedUrl("shared/BlurLayer.qml")).status === Component.Ready
+            text: !blurInstalled
                 ? "The blur helper is not installed: run ./install.sh from the Glasdock folder, then log out and back in once."
                 : "\"Same as the dock\" uses the dock's blur and frost (Appearance → Blur). Lower the launcher opacity to see more of the blur."
         }
-        Loader { id: blurProbe; visible: false; source: Qt.resolvedUrl("shared/BlurLayer.qml") }
         P5Support.DataSource {
             id: runner
             engine: "executable"

@@ -13,9 +13,9 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: Math.round(width * 0.18)
-        color: Qt.rgba(1, 1, 1, 0.08)
+        color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.08)
         border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.12)
+        border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.14)
         visible: img.status !== Image.Ready
         Kirigami.Icon {
             anchors.centerIn: parent
