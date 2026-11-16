@@ -144,12 +144,9 @@ PlasmaCore.Dialog {
                             : card.modelData.active
                             ? (preview.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.42))
                             : (preview.isDark ? Qt.rgba(1, 1, 1, 0.04) : Qt.rgba(1, 1, 1, 0.26))
-                        border.width: 1
-                        border.color: cardArea.containsMouse || card.modelData.active
-                            ? Qt.rgba(preview.accent.r, preview.accent.g, preview.accent.b, cardArea.containsMouse ? 0.72 : 0.42)
-                            : Qt.rgba(1, 1, 1, preview.isDark ? 0.08 : 0.35)
+                        border.width: cardArea.containsMouse || card.modelData.active ? 1 : 0
+                        border.color: Qt.rgba(preview.accent.r, preview.accent.g, preview.accent.b, cardArea.containsMouse ? 0.72 : 0.42)
                         Behavior on color { ColorAnimation { duration: 110 } }
-                        Behavior on border.color { ColorAnimation { duration: 110 } }
 
                         MouseArea {
                             id: cardArea

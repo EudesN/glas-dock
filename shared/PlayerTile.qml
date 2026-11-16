@@ -32,7 +32,7 @@ Tile {
             spacing: 0
             PC3.Label {
                 Layout.fillWidth: true
-                text: tile.hasPlayer ? (tile.player.track || tile.player.identity) : "Nothing playing"
+                text: tile.hasPlayer ? (tile.player.track || tile.player.identity) : ""
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight
             }

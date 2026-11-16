@@ -20,8 +20,9 @@ PlasmoidItem {
     Shared.MprisSource { id: mpris }
     readonly property var player: mpris.player
     readonly property bool hasPlayer: player !== null && player !== undefined
-    readonly property bool playing: hasPlayer && player.playbackStatus === Mpris.PlaybackStatus.Playing
-    readonly property bool idle: !hasPlayer || player.playbackStatus === Mpris.PlaybackStatus.Stopped
+    readonly property bool hasMedia: mpris.hasMedia
+    readonly property bool playing: hasMedia && player.playbackStatus === Mpris.PlaybackStatus.Playing
+    readonly property bool idle: !hasMedia
     // while the panel is being edited the widget is always shown, so it can be
     // found, moved and configured even with "hide when idle" on
     readonly property bool editing: Plasmoid.containment && Plasmoid.containment.corona
@@ -35,8 +36,8 @@ PlasmoidItem {
     preferredRepresentation: fullRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     Plasmoid.status: hidden ? PlasmaCore.Types.PassiveStatus : PlasmaCore.Types.ActiveStatus
-    toolTipMainText: hasPlayer ? (player.track || player.identity) : "Nothing playing"
-    toolTipSubText: hasPlayer ? (player.artist || "") : ""
+    toolTipMainText: hasMedia ? (player.track || player.identity) : "Media player"
+    toolTipSubText: hasMedia ? (player.artist || "") : ""
 
     fullRepresentation: Item {
         id: compact
@@ -62,10 +63,8 @@ PlasmoidItem {
             radius: height / 2
             color: root.isDark ? Qt.rgba(1, 1, 1, hover.hovered ? 0.14 : 0.08)
                                : Qt.rgba(1, 1, 1, hover.hovered ? 0.6 : 0.4)
-            border.width: 1
-            border.color: popup.visible && !popup.closing
-                ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.6)
-                : Qt.rgba(1, 1, 1, root.isDark ? 0.10 : 0.45)
+            border.width: popup.visible && !popup.closing ? 1 : 0
+            border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.6)
         }
 
         HoverHandler { id: hover }
@@ -97,19 +96,19 @@ PlasmoidItem {
 
             // (the cover is only shown in the glass panel)
             Shared.MarqueeText {
-                opacity: root.hasPlayer ? 1 : 0.6
+                opacity: root.hasMedia ? 1 : 0.6
                 Layout.fillWidth: true
                 Layout.preferredWidth: implicitWidth
                 Layout.fillHeight: true
                 scrolling: hover.hovered
-                text: !root.hasPlayer ? "Nothing playing"
+                text: !root.hasMedia ? "Media player"
                     : (root.player.track || root.player.identity)
                       + (root.cfg.showArtist && root.player.artist ? "  ·  " + root.player.artist : "")
             }
 
             // controls: previous / play-pause / next
             Row {
-                visible: root.hasPlayer
+                visible: root.hasMedia
                 spacing: 0
                 Layout.alignment: Qt.AlignVCenter
 
@@ -160,6 +159,13 @@ PlasmoidItem {
 
         Shared.GlassPopup {
             id: popup
+            Connections {
+                target: root
+                function onHiddenChanged() {
+                    if (root.hidden && popup.visible)
+                        popup.close();
+                }
+            }
             anchorItem: compact
             edge: Plasmoid.location
             gap: root.cfg.popupGap

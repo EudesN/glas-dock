@@ -57,7 +57,7 @@ Item {
 
                 PC3.Label {
                     Layout.fillWidth: true
-                    text: popup.hasPlayer ? (popup.player.track || popup.player.identity) : "Nothing playing"
+                    text: popup.hasPlayer ? (popup.player.track || popup.player.identity) : "Media player"
                     font.pixelSize: Math.round(Kirigami.Theme.defaultFont.pixelSize * 1.35)
                     font.weight: Font.DemiBold
                     wrapMode: Text.Wrap

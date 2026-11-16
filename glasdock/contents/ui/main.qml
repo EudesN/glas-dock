@@ -1,5 +1,5 @@
 /*
- * Glasdock — macOS-style dock for Plasma 6
+ * Glasdock — custom glass dock for KDE Plasma 6 (GlasDo project)
  * Parabolic icon zoom, glass background, launch bounce and its own app launcher.
  */
 import QtQuick
@@ -19,6 +19,8 @@ PlasmoidItem {
     preferredRepresentation: fullRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     Plasmoid.constraintHints: Plasmoid.CanFillArea
+    Plasmoid.status: dockItem && dockItem.keepPanelOpen ? PlasmaCore.Types.RequiresAttentionStatus
+                                                        : PlasmaCore.Types.ActiveStatus
 
     // ---------------------------------------------------------------- model
     TaskManager.VirtualDesktopInfo { id: virtualDesktopInfo }
@@ -129,6 +131,7 @@ PlasmoidItem {
         sourceComponent: Widgets.MprisSource {}
     }
     readonly property var activePlayer: mprisLoader.item ? mprisLoader.item.player : null
+    readonly property bool playerHasMedia: mprisLoader.item ? mprisLoader.item.hasMedia : false
 
     Loader {
         id: weatherLoader
@@ -199,10 +202,15 @@ PlasmoidItem {
         readonly property real barHeight: baseIcon + pad * 2
         readonly property real barY: height - bottomGap - barHeight
         // --- widgets (player, weather, clock) after the app icons
+        readonly property bool showPlayerTile: cfg.showPlayer && root.playerHasMedia
+        onShowPlayerTileChanged: {
+            if (!showPlayerTile && widgetPopup.visible && widgetPopupAnchor === playerTile)
+                popupFrame.playClose();
+        }
         readonly property real sepGap: Math.max(spacing, 6) * 2 + 1
         readonly property var widgetWidths: {
             const w = [];
-            if (cfg.showPlayer) w.push(Math.round(baseIcon * 3.8));
+            if (showPlayerTile) w.push(Math.round(baseIcon * 3.8));
             if (cfg.showWeather) w.push(Math.round(baseIcon * 2.4));
             if (cfg.showClock) w.push(Math.round(baseIcon * 2.4));
             return w;
@@ -271,7 +279,7 @@ PlasmoidItem {
         // + room for one more icon: a newly opened app fits even before Plasma
         // has resized the panel (it was cut at the edge for a moment)
         readonly property real spareRoom: baseIcon + spacing
-        Layout.minimumWidth: restWidth + pad * 2 + zoomSlack + 8 + spareRoom
+        Layout.minimumWidth: Math.ceil(restWidth + pad * 2 + zoomSlack + 8 + spareRoom)
         Layout.preferredWidth: Layout.minimumWidth
         Layout.maximumWidth: Layout.minimumWidth
         Layout.fillHeight: true
@@ -311,6 +319,7 @@ PlasmoidItem {
         // --- window previews on hover
         property Item previewTask: null   // task whose previews are shown / pending
         readonly property bool previewOpen: windowPreview.visible
+        readonly property bool keepPanelOpen: windowPreview.visible || launcher.visible || widgetPopup.visible || contextMenuOpen
 
         // windows of a task: one entry per window (children of a group)
         function windowsOf(task) {
@@ -785,8 +794,6 @@ PlasmoidItem {
             onVisibleChanged: {
                 if (!visible)
                     dock.launcherHiddenAt = Date.now();
-                Plasmoid.status = visible || widgetPopup.visible ? PlasmaCore.Types.RequiresAttentionStatus
-                                                                 : PlasmaCore.Types.ActiveStatus;
             }
             onWidthChanged: if (visible) reposition()
             onHeightChanged: if (visible) reposition()
@@ -867,7 +874,7 @@ PlasmoidItem {
 
             Widgets.PlayerTile {
                 id: playerTile
-                visible: dock.cfg.showPlayer
+                visible: dock.showPlayerTile
                 width: Math.round(dock.baseIcon * 3.8)
                 height: parent.height
                 isDark: dock.isDark
@@ -960,8 +967,6 @@ PlasmoidItem {
                     widgetPopupLoader.sourceComponent = undefined;
                 } else
                     popupFrame.playOpen();
-                Plasmoid.status = visible || launcher.visible ? PlasmaCore.Types.RequiresAttentionStatus
-                                                              : PlasmaCore.Types.ActiveStatus;
             }
             onWidthChanged: if (visible) reposition()
             onHeightChanged: if (visible) reposition()
@@ -1381,10 +1386,8 @@ PlasmoidItem {
                     x: (task.width - width) / 2
                     y: Math.max(-task.y, -height - Kirigami.Units.smallSpacing * 2)
                     color: dock.isDark ? Qt.rgba(0.10, 0.10, 0.13, 0.88) : Qt.rgba(1, 1, 1, 0.88)
-                    border.width: 1
-                    border.color: dock.cfg.useAccentColor
-                        ? Qt.rgba(dock.accent.r, dock.accent.g, dock.accent.b, 0.7)
-                        : Qt.rgba(1, 1, 1, dock.isDark ? 0.18 : 0.6)
+                    border.width: dock.cfg.useAccentColor ? 1 : 0
+                    border.color: Qt.rgba(dock.accent.r, dock.accent.g, dock.accent.b, 0.7)
                     shadow.size: 12
                     shadow.yOffset: 3
                     shadow.color: Qt.rgba(0, 0, 0, dock.isDark ? 0.45 : 0.20)

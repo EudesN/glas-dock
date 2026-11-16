@@ -12,12 +12,19 @@ Item {
     // 0 = Follow system, 1 = Dark, 2 = Light
     property int themeMode: 0
 
+    // Read from SystemPalette rather than Kirigami.Theme on this hidden item:
+    // Kirigami.Theme on a visible:false (or unattached) Item defaults to #000000.
+    SystemPalette {
+        id: systemPalette
+        colorGroup: SystemPalette.Active
+    }
+
     readonly property bool systemDark: Kirigami.ColorUtils.brightnessForColor(
-        Kirigami.Theme.backgroundColor) === Kirigami.ColorUtils.Dark
+        systemPalette.window) === Kirigami.ColorUtils.Dark
     readonly property bool isDark: themeMode === 0 ? systemDark : (themeMode === 1)
     readonly property color accent: isDark
-        && Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.highlightColor) === Kirigami.ColorUtils.Dark
-        ? Qt.lighter(Kirigami.Theme.highlightColor, 1.5) : Kirigami.Theme.highlightColor
+        && Kirigami.ColorUtils.brightnessForColor(systemPalette.highlight) === Kirigami.ColorUtils.Dark
+        ? Qt.lighter(systemPalette.highlight, 1.5) : systemPalette.highlight
 
     visible: false
     width: 0

@@ -45,8 +45,6 @@ Item {
         Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
         radius: Math.round(width * 0.18)
         color: "transparent"
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.16)
         shadow.size: cover.width > 60 ? 16 : 0
         shadow.yOffset: cover.width > 60 ? 4 : 0
         shadow.color: Qt.rgba(0, 0, 0, 0.35)

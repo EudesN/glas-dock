@@ -35,7 +35,7 @@ KCM.SimpleKCM {
         QQC2.CheckBox { id: showArtist; Kirigami.FormData.label: "Show:"; text: "Artist next to the title" }
         QQC2.CheckBox { id: showSkipButtons; text: "Previous / next buttons" }
         QQC2.CheckBox { id: pillBackground; text: "Glass pill background" }
-        QQC2.CheckBox { id: hideWhenIdle; Kirigami.FormData.label: "Behavior:"; text: "Hide when nothing is playing" }
+        QQC2.CheckBox { id: hideWhenIdle; Kirigami.FormData.label: "Behavior:"; text: "Only show when media is playing or queued" }
 
         Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Glass panel" }
 
@@ -86,26 +86,27 @@ KCM.SimpleKCM {
             Kirigami.FormData.isSection: true
             Kirigami.FormData.label: "Blur"
         }
-        QQC2.CheckBox {
+        QQC2.ComboBox {
             id: blurBehind
-            Kirigami.FormData.label: "Blur:"
-            text: "Blur the desktop behind the glass"
-            checked: cfg_popupBlur || cfg_popupStyle === 4
-            onToggled: {
-                cfg_popupBlur = checked;
+            Kirigami.FormData.label: "Blur behind:"
+            enabled: popupStyle.currentIndex !== 3
+            model: ["On", "Off"]
+            currentIndex: (cfg_popupBlur || cfg_popupStyle === 4) ? 0 : 1
+            onActivated: index => {
+                cfg_popupBlur = (index === 0);
                 if (cfg_popupStyle === 4)
                     cfg_popupStyle = 0;
             }
         }
         RowLayout {
             Kirigami.FormData.label: "Frost:"
-            enabled: blurBehind.checked
+            enabled: popupStyle.currentIndex !== 3 && blurBehind.currentIndex === 0
             QQC2.Slider { id: blurFrost; from: 0.0; to: 1.0; stepSize: 0.01 }
             QQC2.Label { text: Math.round(blurFrost.value * 100) + "%" }
         }
         RowLayout {
             Kirigami.FormData.label: "Blur strength:"
-            enabled: blurBehind.checked
+            enabled: popupStyle.currentIndex !== 3 && blurBehind.currentIndex === 0
             QQC2.Button {
                 text: "Desktop Effects…"
                 icon.name: "preferences-desktop-effects"

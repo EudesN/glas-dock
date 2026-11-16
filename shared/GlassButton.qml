@@ -31,11 +31,7 @@ Rectangle {
     color: filled ? (area.containsMouse ? Qt.lighter(accent, 1.14) : accent)
         : isDark ? Qt.rgba(1, 1, 1, area.containsMouse ? 0.16 : 0.08)
         : Qt.rgba(1, 1, 1, area.containsMouse ? 0.62 : 0.42)
-    border.width: 1
-    border.color: filled ? Qt.rgba(1, 1, 1, 0.22)
-        : Qt.rgba(1, 1, 1, isDark ? (area.containsMouse ? 0.18 : 0.10) : 0.48)
     Behavior on color { ColorAnimation { duration: 120 } }
-    Behavior on border.color { ColorAnimation { duration: 120 } }
 
     scale: area.pressed ? 0.94 : 1
     Behavior on scale { NumberAnimation { duration: 90 } }

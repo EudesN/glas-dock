@@ -73,26 +73,27 @@ KCM.SimpleKCM {
             Kirigami.FormData.isSection: true
             Kirigami.FormData.label: "Blur"
         }
-        QQC2.CheckBox {
+        QQC2.ComboBox {
             id: blurBehind
-            Kirigami.FormData.label: "Blur:"
-            text: "Blur the desktop behind the glass (dock, launcher, panels, previews)"
-            checked: cfg_blurBehind || cfg_dockStyle === 4
-            onToggled: {
-                cfg_blurBehind = checked;
+            Kirigami.FormData.label: "Blur behind:"
+            enabled: dockStyle.currentIndex !== 3
+            model: ["On", "Off"]
+            currentIndex: (cfg_blurBehind || cfg_dockStyle === 4) ? 0 : 1
+            onActivated: index => {
+                cfg_blurBehind = (index === 0);
                 if (cfg_dockStyle === 4)
                     cfg_dockStyle = 0;
             }
         }
         RowLayout {
             Kirigami.FormData.label: "Frost:"
-            enabled: blurBehind.checked
+            enabled: dockStyle.currentIndex !== 3 && blurBehind.currentIndex === 0
             QQC2.Slider { id: blurFrost; from: 0.0; to: 1.0; stepSize: 0.01 }
             QQC2.Label { text: Math.round(blurFrost.value * 100) + "%" }
         }
         RowLayout {
             Kirigami.FormData.label: "Blur strength:"
-            enabled: blurBehind.checked
+            enabled: dockStyle.currentIndex !== 3 && blurBehind.currentIndex === 0
             QQC2.Button {
                 text: "Desktop Effects…"
                 icon.name: "preferences-desktop-effects"

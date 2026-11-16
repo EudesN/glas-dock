@@ -273,14 +273,32 @@ Item {
                             onClicked: view.currentCategory = -1
                         }
                     }
-                    delegate: CategoryButton {
+                    delegate: Item {
                         required property int index
                         required property var model
+                        readonly property bool hasDividerAfter: index === 0 && categories.count > 1
                         width: categories.width
-                        text: model.display
-                        iconSource: model.decoration
-                        checked: view.currentCategory === index
-                        onClicked: view.currentCategory = index
+                        height: catItem.implicitHeight + (hasDividerAfter ? 11 : 0)
+
+                        CategoryButton {
+                            id: catItem
+                            width: parent.width
+                            text: model.display
+                            iconSource: model.decoration
+                            checked: view.currentCategory === index
+                            onClicked: view.currentCategory = index
+                        }
+                        Rectangle {
+                            visible: hasDividerAfter
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.leftMargin: Kirigami.Units.largeSpacing + 2
+                            anchors.rightMargin: Kirigami.Units.largeSpacing + 2
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 2
+                            height: 1
+                            color: view.isDark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.12)
+                        }
                     }
                 }
             }

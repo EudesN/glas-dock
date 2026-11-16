@@ -85,8 +85,6 @@ Item {
                     implicitHeight: chipRow.implicitHeight + Kirigami.Units.smallSpacing * 2
                     radius: height / 2
                     color: popup.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.50)
-                    border.width: 1
-                    border.color: popup.isDark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.08)
                     RowLayout {
                         id: chipRow
                         anchors.centerIn: parent
@@ -116,8 +114,6 @@ Item {
                     implicitHeight: dayCol.implicitHeight + Kirigami.Units.largeSpacing * 2
                     radius: Kirigami.Units.cornerRadius * 2
                     color: popup.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.52)
-                    border.width: 1
-                    border.color: popup.isDark ? Qt.rgba(1, 1, 1, 0.11) : Qt.rgba(0, 0, 0, 0.09)
 
                 ColumnLayout {
                     id: dayCol

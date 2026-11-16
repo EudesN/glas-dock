@@ -17,6 +17,11 @@ Item {
 
     property var rawPlayer: null
     readonly property var player: rawPlayer ? playerProxy : null
+    readonly property bool hasMedia: rawPlayer !== null
+        && rawPlayer.playbackStatus !== Mpris.PlaybackStatus.Stopped
+        && (playerProxy.track.length > 0
+            || rawPlayer.playbackStatus === Mpris.PlaybackStatus.Playing
+            || rawPlayer.playbackStatus === Mpris.PlaybackStatus.Paused)
     property int matchedTaskRow: -1
     property string matchedTaskAppId: ""
 
@@ -273,11 +278,13 @@ Item {
             required property bool isMultiplexer
             onContainerChanged: pickTimer.restart()
             onIsMultiplexerChanged: pickTimer.restart()
-            // a player that starts/stops playing can change the fallback choice
+            // a player that starts/stops playing or loads a track can change the choice
             readonly property int status: container ? container.playbackStatus : 0
             onStatusChanged: pickTimer.restart()
             readonly property string identity: container ? (container.identity || "") : ""
             onIdentityChanged: pickTimer.restart()
+            readonly property string track: container ? (container.track || "") : ""
+            onTrackChanged: pickTimer.restart()
         }
         onObjectAdded: pickTimer.restart()
         onObjectRemoved: pickTimer.restart()
@@ -300,23 +307,30 @@ Item {
     Component.onCompleted: pickTimer.start()
 
     function pick() {
-        let multiplexer = null, playing = null, any = null;
+        let multiplexer = null, playing = null, queued = null, any = null;
         for (let i = 0; i < rows.count; i++) {
             const r = rows.objectAt(i);
             if (!r || !r.container)
                 continue;
+            const c = r.container;
+            const hasQueue = c.playbackStatus !== Mpris.PlaybackStatus.Stopped
+                && ((c.track || "") !== ""
+                    || c.playbackStatus === Mpris.PlaybackStatus.Playing
+                    || c.playbackStatus === Mpris.PlaybackStatus.Paused);
             if (r.isMultiplexer) {
-                // only when it actually points at a player
-                if (r.container.identity)
-                    multiplexer = r.container;
+                // only when it actually points at a player with active/queued media
+                if (c.identity && hasQueue)
+                    multiplexer = c;
             } else {
-                if (!any)
-                    any = r.container;
-                if (!playing && r.container.playbackStatus === Mpris.PlaybackStatus.Playing)
-                    playing = r.container;
+                if (!any && hasQueue)
+                    any = c;
+                if (!playing && c.playbackStatus === Mpris.PlaybackStatus.Playing)
+                    playing = c;
+                if (!queued && hasQueue)
+                    queued = c;
             }
         }
-        const next = multiplexer || playing || any;
+        const next = multiplexer || playing || queued || any;
         if (rawPlayer !== next)
             rawPlayer = next;
     }

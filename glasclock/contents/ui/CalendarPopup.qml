@@ -52,12 +52,39 @@ Item {
         weeks: 6
         firstDayOfWeek: Qt.locale().firstDayOfWeek
         today: popup.todayDate
+        property int lastMonthKey: year * 12 + month
+        property int monthDir: 1
+        function handleMonthChange() {
+            const key = year * 12 + month;
+            if (key === lastMonthKey)
+                return;
+            monthDir = key > lastMonthKey ? 1 : -1;
+            lastMonthKey = key;
+            monthTransition.restart();
+        }
+        onMonthChanged: handleMonthChange()
+        onYearChanged: handleMonthChange()
         Component.onCompleted: {
             displayedDate = popup.todayDate;
+            lastMonthKey = year * 12 + month;
             if (popup.eventPluginsManager)
                 daysModel.setPluginsManager(popup.eventPluginsManager);
         }
     }
+
+    ParallelAnimation {
+        id: monthTransition
+        NumberAnimation { target: monthSlide; property: "x"; from: calendar.monthDir * 14; to: 0; duration: 190; easing.type: Easing.OutCubic }
+        NumberAnimation { target: daysGrid; property: "opacity"; from: 0.25; to: 1; duration: 190; easing.type: Easing.OutCubic }
+        NumberAnimation { target: monthLabelSlide; property: "x"; from: calendar.monthDir * 8; to: 0; duration: 160; easing.type: Easing.OutCubic }
+        NumberAnimation { target: monthLabel; property: "opacity"; from: 0.35; to: 1; duration: 160; easing.type: Easing.OutCubic }
+    }
+    ParallelAnimation {
+        id: agendaTransition
+        NumberAnimation { target: agendaSlide; property: "y"; from: 4; to: 0; duration: 160; easing.type: Easing.OutCubic }
+        NumberAnimation { target: agendaCol; property: "opacity"; from: 0.35; to: 1; duration: 160; easing.type: Easing.OutCubic }
+    }
+    onSelectedChanged: if (visible) agendaTransition.restart()
     Connections {
         target: calendar.daysModel
         function onAgendaUpdated() { popup.revision++; }
@@ -126,9 +153,11 @@ Item {
                 onClicked: calendar.previousMonth()
             }
             PC3.Label {
+                id: monthLabel
                 text: (calendar.monthName + (calendar.year !== popup.now.getFullYear() ? " " + calendar.year : "")).toUpperCase()
                 color: popup.accent
                 font.weight: Font.Bold
+                transform: Translate { id: monthLabelSlide }
             }
             Shared.GlassButton {
                 iconName: "go-next"
@@ -144,10 +173,12 @@ Item {
 
             // -------------------------------------------------------- agenda
             ColumnLayout {
+                id: agendaCol
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 15
                 Layout.maximumWidth: Kirigami.Units.gridUnit * 15
                 Layout.alignment: Qt.AlignTop
                 spacing: Kirigami.Units.smallSpacing
+                transform: Translate { id: agendaSlide }
 
                 Repeater {
                     model: popup.agenda
@@ -230,6 +261,7 @@ Item {
                 id: monthGrid
                 Layout.alignment: Qt.AlignTop
                 spacing: 0
+                clip: true
 
                 Row {
                     Repeater {
@@ -240,14 +272,16 @@ Item {
                             horizontalAlignment: Text.AlignHCenter
                             readonly property int dow: (calendar.firstDayOfWeek + index - 1) % 7 + 1
                             text: Qt.locale().dayName(dow % 7, Locale.NarrowFormat)
-                            opacity: dow === 6 || dow === 7 ? 0.45 : 0.75
+                            opacity: 0.75
                             font.weight: Font.DemiBold
                         }
                     }
                 }
 
                 Grid {
+                    id: daysGrid
                     columns: 7
+                    transform: Translate { id: monthSlide }
                     Repeater {
                         model: calendar.daysModel
                         delegate: Item {
@@ -267,31 +301,42 @@ Item {
                                 width: popup.cell * 0.82
                                 height: width
                                 radius: width / 2
-                                color: day.isToday ? popup.accent
+                                color: day.isToday ? Qt.rgba(popup.accent.r, popup.accent.g, popup.accent.b, popup.isDark ? 0.34 : 0.28)
                                      : day.isSelected ? Qt.rgba(popup.accent.r, popup.accent.g, popup.accent.b, popup.isDark ? 0.18 : 0.22)
                                      : dayArea.containsMouse ? (popup.isDark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.08)) : "transparent"
-                                border.width: day.isSelected && !day.isToday ? 1.5 : 0
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                            }
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: popup.cell * 0.82
+                                height: width
+                                radius: width / 2
+                                color: "transparent"
+                                border.width: 1.5
                                 border.color: popup.accent
-                                Behavior on color { ColorAnimation { duration: 100 } }
+                                opacity: day.isSelected && !day.isToday ? 1 : 0
+                                scale: day.isSelected && !day.isToday ? 1 : 0.82
+                                Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                                Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
                             }
                             PC3.Label {
                                 anchors.centerIn: parent
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
                                 text: day.model.dayNumber
-                                color: day.isToday
-                                    ? (Kirigami.ColorUtils.brightnessForColor(popup.accent) === Kirigami.ColorUtils.Light ? "#1d1d1f" : "white")
-                                    : Kirigami.Theme.textColor
-                                opacity: day.isToday ? 1 : !day.inMonth ? 0.3 : day.weekend ? 0.55 : 1
+                                color: Kirigami.Theme.textColor
+                                opacity: day.inMonth ? 1 : 0.32
                                 font.weight: day.isToday ? Font.Bold : Font.Normal
                             }
                             // has events
                             Rectangle {
-                                visible: (day.model.eventCount || 0) > 0 && !day.isToday
+                                visible: (day.model.eventCount || 0) > 0
                                 width: 4
                                 height: 4
                                 radius: 2
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 anchors.bottom: parent.bottom
-                                anchors.bottomMargin: popup.cell * 0.08
+                                anchors.bottomMargin: 1
                                 color: popup.accent
                                 opacity: day.inMonth ? 1 : 0.4
                             }

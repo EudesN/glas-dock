@@ -179,10 +179,8 @@ PlasmoidItem {
             radius: height / 2
             color: root.isDark ? Qt.rgba(1, 1, 1, area.containsMouse ? 0.14 : 0.08)
                                : Qt.rgba(1, 1, 1, area.containsMouse ? 0.6 : 0.4)
-            border.width: 1
-            border.color: popup.visible && !popup.closing
-                ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.6)
-                : Qt.rgba(1, 1, 1, root.isDark ? 0.10 : 0.45)
+            border.width: popup.visible && !popup.closing ? 1 : 0
+            border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.6)
         }
 
         MouseArea {
