@@ -228,7 +228,10 @@ PlasmoidItem {
             function onRowsMoved() { dock.modelRevision++; }
             function onRowsInserted() { dock.modelRevision++; }
             function onRowsRemoved() { dock.modelRevision++; }
-            function onModelReset() { dock.modelRevision++; }
+            function onModelReset() {
+                dock.modelRevision++;
+                dock.bouncingCount = 0;
+            }
             function onDataChanged() { dock.modelRevision++; }
         }
         function launcherKeyOf(row) {
@@ -319,7 +322,8 @@ PlasmoidItem {
         // --- window previews on hover
         property Item previewTask: null   // task whose previews are shown / pending
         readonly property bool previewOpen: windowPreview.visible
-        readonly property bool keepPanelOpen: windowPreview.visible || launcher.visible || widgetPopup.visible || contextMenuOpen
+        property int bouncingCount: 0
+        readonly property bool keepPanelOpen: windowPreview.visible || launcher.visible || widgetPopup.visible || contextMenuOpen || bouncingCount > 0
 
         // windows of a task: one entry per window (children of a group)
         function windowsOf(task) {
@@ -1126,9 +1130,21 @@ PlasmoidItem {
                 readonly property int badgeCount: root.badgeFor(model.AppId, model.LauncherUrlWithoutIcon)
                 readonly property alias hovered: mouse.containsMouse
 
-                Component.onDestruction: if (dock.previewTask === task) dock.hidePreview()
+                Component.onDestruction: {
+                    if (dock.previewTask === task)
+                        dock.hidePreview();
+                    if (isBouncing)
+                        dock.bouncingCount = Math.max(0, dock.bouncingCount - 1);
+                }
                 property real bounce: 0
                 property bool launching: false
+                readonly property bool isBouncing: bounceAnim.running
+                onIsBouncingChanged: {
+                    if (isBouncing)
+                        dock.bouncingCount++;
+                    else
+                        dock.bouncingCount = Math.max(0, dock.bouncingCount - 1);
+                }
 
                 readonly property bool dragged: dock.dragItem === task
                 x: dragged ? dock.dragX - width / 2 : (dock.layout.xs[slot] ?? 0)
@@ -1143,7 +1159,12 @@ PlasmoidItem {
                 z: dragged ? 20 : (mouse.containsMouse ? 10 : 1)
                 opacity: dragged ? 0.85 : 1
 
-                onIsLauncherChanged: if (!isLauncher) launching = false
+                onIsLauncherChanged: {
+                    if (!isLauncher) {
+                        launching = false;
+                        launchTimer.stop();
+                    }
+                }
 
                 function modelIndex(child) {
                     return tasksModel.makeModelIndex(index, child === undefined ? -1 : child);
@@ -1207,6 +1228,7 @@ PlasmoidItem {
                 onStartupChanged: if (startup) startLaunchBounce()
                 onAttentionChanged: attentionLeft = attention ? 3 : 0
                 SequentialAnimation {
+                    id: bounceAnim
                     loops: Animation.Infinite
                     alwaysRunToEnd: true
                     running: task.launching || task.attentionLeft > 0
