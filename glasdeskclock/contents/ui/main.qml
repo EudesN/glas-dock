@@ -59,6 +59,17 @@ PlasmoidItem {
         return use12Hour() ? Qt.formatTime(d, "AP") : "";
     }
 
+    function formattedWeekdayPrefix(d) {
+        if (!cfg.showWeekday)
+            return "";
+        return d.toLocaleDateString(Qt.locale(), "ddd").toUpperCase().replace(/\.$/, "") + ",";
+    }
+
+    function formattedShortDate(d) {
+        const s = d.toLocaleDateString(Qt.locale(), "MMM d");
+        return s.toUpperCase().replace(/\./g, "");
+    }
+
     function formattedDate(d) {
         if (cfg.showWeekday) {
             const s = d.toLocaleDateString(Qt.locale(), "dddd, d MMM");
@@ -88,8 +99,8 @@ PlasmoidItem {
         readonly property int pad: Math.round(Math.max(Kirigami.Units.largeSpacing, Math.min(width, height) * 0.08))
         readonly property color dropTint: root.isDark ? Qt.rgba(0, 0, 0, 0.45) : Qt.rgba(1, 1, 1, 0.55)
 
-        implicitWidth: Kirigami.Units.gridUnit * (mode === 2 ? 14 : mode === 1 ? 15 : 19)
-        implicitHeight: Kirigami.Units.gridUnit * (mode === 2 ? 14 : mode === 1 ? 13 : 9)
+        implicitWidth: Kirigami.Units.gridUnit * (mode === 2 ? 14 : mode === 1 ? 15 : 17)
+        implicitHeight: Kirigami.Units.gridUnit * (mode === 2 ? 14 : mode === 1 ? 13 : 9.5)
         Layout.minimumWidth: Kirigami.Units.gridUnit * 8
         Layout.minimumHeight: Kirigami.Units.gridUnit * 6
 
@@ -103,7 +114,8 @@ PlasmoidItem {
             accent: root.accent
             showBorder: root.cfg.showBorder
             showShadow: root.cfg.showShadow
-            blurBehind: false
+            blurBehind: root.cfg.blurBehind
+            frost: root.cfg.blurFrost
         }
 
         Item {
@@ -113,26 +125,55 @@ PlasmoidItem {
 
             readonly property real baseDigitPx: desk.mode === 1
                 ? Math.max(24, Math.min(width * 0.48, height * (root.cfg.showDate ? 0.34 : 0.40)))
-                : Math.max(22, Math.min(width / (root.cfg.showSeconds ? 4.8 : 3.6),
-                                        height / (root.cfg.showDate ? 2.1 : 1.4)))
+                : Math.max(28, Math.min(width / (root.cfg.showSeconds ? 4.3 : 3.0),
+                                        height * (root.cfg.showDate ? 0.62 : 0.78)))
 
-            // ---- Mode 0: Digital
+            // ---- Mode 0: Digital (accent weekday + bold date above giant numeral)
             ColumnLayout {
                 visible: desk.mode === 0
                 anchors.fill: parent
-                spacing: Math.max(2, Math.round(inner.baseDigitPx * 0.1))
+                spacing: Math.max(0, Math.round(inner.baseDigitPx * 0.04))
 
                 Item { Layout.fillHeight: true }
 
                 RowLayout {
+                    visible: root.cfg.showDate
                     Layout.alignment: desk.hAlign
-                    spacing: Math.max(4, Math.round(inner.baseDigitPx * 0.14))
+                    spacing: Math.max(4, Math.round(inner.baseDigitPx * 0.08))
+
+                    PC3.Label {
+                        visible: root.cfg.showWeekday
+                        text: root.formattedWeekdayPrefix(root.now)
+                        color: root.accent
+                        font.pixelSize: Math.max(12, Math.round(inner.baseDigitPx * 0.24))
+                        font.weight: Font.Bold
+                        font.letterSpacing: 0.6
+                        style: root.cfg.showCard ? Text.Normal : Text.Raised
+                        styleColor: desk.dropTint
+                    }
+                    PC3.Label {
+                        text: root.formattedShortDate(root.now)
+                        font.pixelSize: Math.max(12, Math.round(inner.baseDigitPx * 0.24))
+                        font.weight: Font.DemiBold
+                        font.letterSpacing: 0.4
+                        opacity: 0.88
+                        elide: Text.ElideRight
+                        style: root.cfg.showCard ? Text.Normal : Text.Raised
+                        styleColor: desk.dropTint
+                    }
+                }
+
+                RowLayout {
+                    Layout.alignment: desk.hAlign
+                    spacing: Math.max(4, Math.round(inner.baseDigitPx * 0.12))
 
                     PC3.Label {
                         text: root.formattedHm(root.now)
                         font.pixelSize: Math.round(inner.baseDigitPx)
-                        font.weight: Font.DemiBold
+                        font.weight: Font.Bold
                         font.features: { "tnum": 1 }
+                        font.letterSpacing: -1.5
+                        lineHeight: 0.88
                         style: root.cfg.showCard ? Text.Normal : Text.Raised
                         styleColor: desk.dropTint
                     }
@@ -145,7 +186,7 @@ PlasmoidItem {
                         PC3.Label {
                             visible: root.formattedAmPm(root.now).length > 0
                             text: root.formattedAmPm(root.now)
-                            font.pixelSize: Math.max(10, Math.round(inner.baseDigitPx * 0.24))
+                            font.pixelSize: Math.max(10, Math.round(inner.baseDigitPx * 0.22))
                             font.weight: Font.DemiBold
                             opacity: 0.7
                             style: root.cfg.showCard ? Text.Normal : Text.Raised
@@ -154,7 +195,7 @@ PlasmoidItem {
                         PC3.Label {
                             visible: root.cfg.showSeconds
                             text: ":" + root.formattedSeconds(root.now)
-                            font.pixelSize: Math.max(12, Math.round(inner.baseDigitPx * 0.36))
+                            font.pixelSize: Math.max(12, Math.round(inner.baseDigitPx * 0.34))
                             font.weight: Font.Medium
                             font.features: { "tnum": 1 }
                             color: root.cfg.accentSeconds ? root.accent : Kirigami.Theme.textColor
@@ -163,18 +204,6 @@ PlasmoidItem {
                             styleColor: desk.dropTint
                         }
                     }
-                }
-
-                PC3.Label {
-                    visible: root.cfg.showDate
-                    Layout.fillWidth: true
-                    horizontalAlignment: desk.textAlign
-                    text: root.formattedDate(root.now)
-                    font.pixelSize: Math.max(11, Math.round(inner.baseDigitPx * 0.28))
-                    opacity: 0.72
-                    elide: Text.ElideRight
-                    style: root.cfg.showCard ? Text.Normal : Text.Raised
-                    styleColor: desk.dropTint
                 }
 
                 Item { Layout.fillHeight: true }

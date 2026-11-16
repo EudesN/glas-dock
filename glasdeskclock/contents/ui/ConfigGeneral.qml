@@ -3,6 +3,7 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
+import org.kde.plasma.plasma5support as P5Support
 
 KCM.SimpleKCM {
     id: page
@@ -21,6 +22,8 @@ KCM.SimpleKCM {
     property alias cfg_themeMode: themeMode.currentIndex
     property alias cfg_cardOpacity: cardOpacity.value
     property alias cfg_cardRadius: cardRadius.value
+    property bool cfg_blurBehind
+    property alias cfg_blurFrost: blurFrost.value
     property alias cfg_showBorder: showBorder.checked
     property alias cfg_showShadow: showShadow.checked
 
@@ -77,7 +80,49 @@ KCM.SimpleKCM {
             textFromValue: v => v + " px"
             valueFromText: t => parseInt(t)
         }
-        QQC2.CheckBox { id: showBorder; text: "Inner light border"; enabled: showCard.checked }
-        QQC2.CheckBox { id: showShadow; text: "Drop shadow"; enabled: showCard.checked }
+        QQC2.CheckBox { id: showBorder; text: "Border"; enabled: showCard.checked }
+        QQC2.CheckBox { id: showShadow; text: "Shadow"; enabled: showCard.checked && cardStyle.currentIndex !== 2 }
+
+        Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Blur" }
+
+        QQC2.ComboBox {
+            id: blurBehind
+            Kirigami.FormData.label: "Blur behind:"
+            enabled: showCard.checked && cardStyle.currentIndex !== 3
+            model: ["On", "Off"]
+            currentIndex: cfg_blurBehind ? 0 : 1
+            onActivated: index => cfg_blurBehind = (index === 0)
+        }
+        RowLayout {
+            Kirigami.FormData.label: "Frost:"
+            enabled: showCard.checked && cardStyle.currentIndex !== 3 && blurBehind.currentIndex === 0
+            QQC2.Slider { id: blurFrost; from: 0.0; to: 1.0; stepSize: 0.01 }
+            QQC2.Label { text: Math.round(blurFrost.value * 100) + "%" }
+        }
+        RowLayout {
+            Kirigami.FormData.label: "Blur strength:"
+            enabled: showCard.checked && cardStyle.currentIndex !== 3 && blurBehind.currentIndex === 0
+            QQC2.Button {
+                text: "Desktop Effects…"
+                icon.name: "preferences-desktop-effects"
+                onClicked: runner.connectSource("systemsettings kcm_kwin_effects")
+            }
+        }
+        QQC2.Label {
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 22
+            wrapMode: Text.WordWrap
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+            readonly property bool blurInstalled: Qt.createComponent(Qt.resolvedUrl("shared/BlurLayer.qml")).status === Component.Ready
+            text: !blurInstalled
+                ? "The blur helper is not installed: run ./install.sh from the Glasdock folder, then log out and back in once."
+                : "Frost adds a milky, grainy layer over the blur. Lower the opacity to see more of the blur."
+        }
+        P5Support.DataSource {
+            id: runner
+            engine: "executable"
+            connectedSources: []
+            onNewData: sourceName => disconnectSource(sourceName)
+        }
     }
 }

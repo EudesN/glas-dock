@@ -6,8 +6,8 @@
   <group name="General">
     <entry name="clockStyle" type="Int"><default>0</default></entry>
     <entry name="timeFormat" type="Int"><default>0</default></entry>
-    <entry name="alignment" type="Int"><default>1</default></entry>
-    <entry name="showSeconds" type="Bool"><default>true</default></entry>
+    <entry name="alignment" type="Int"><default>0</default></entry>
+    <entry name="showSeconds" type="Bool"><default>false</default></entry>
     <entry name="showDate" type="Bool"><default>true</default></entry>
     <entry name="showWeekday" type="Bool"><default>true</default></entry>
     <entry name="showDayProgress" type="Bool"><default>false</default></entry>
@@ -15,9 +15,11 @@
     <entry name="showCard" type="Bool"><default>true</default></entry>
     <entry name="cardStyle" type="Int"><default>0</default></entry>
     <entry name="themeMode" type="Int"><default>0</default></entry>
-    <entry name="cardOpacity" type="Double"><default>0.42</default></entry>
-    <entry name="cardRadius" type="Int"><default>26</default></entry>
-    <entry name="showBorder" type="Bool"><default>true</default></entry>
+    <entry name="cardOpacity" type="Double"><default>0.26</default></entry>
+    <entry name="cardRadius" type="Int"><default>24</default></entry>
+    <entry name="blurBehind" type="Bool"><default>true</default></entry>
+    <entry name="blurFrost" type="Double"><default>0.12</default></entry>
+    <entry name="showBorder" type="Bool"><default>false</default></entry>
     <entry name="showShadow" type="Bool"><default>true</default></entry>
   </group>
 </kcfg>
