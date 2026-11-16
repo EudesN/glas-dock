@@ -35,6 +35,7 @@ Item {
             return "#ff9f0a";
         return "#30d158";
     }
+    readonly property color fgColor: isDark ? "#f2f2f7" : "#1d1d1f"
     readonly property color trackColor: isDark ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.12)
     readonly property real strokePx: Math.max(4, Math.round(ringSize * 0.115))
     readonly property real radiusPx: Math.max(8, ringSize / 2 - strokePx / 2)
@@ -111,7 +112,7 @@ Item {
                 height: width
                 source: cell.device ? cell.device.iconSource : ""
                 isMask: true
-                color: Kirigami.Theme.textColor
+                color: cell.fgColor
                 opacity: 0.86
             }
         }
@@ -126,12 +127,13 @@ Item {
                 Layout.preferredHeight: Layout.preferredWidth
                 source: Qt.resolvedUrl("icons/bolt.svg")
                 isMask: true
-                color: Kirigami.Theme.textColor
+                color: cell.fgColor
             }
 
             PC3.Label {
                 id: pctLabel
                 text: cell.targetPercent + " %"
+                color: cell.fgColor
                 font.pixelSize: Math.max(11, Math.round(cell.ringSize * 0.21))
                 font.weight: Font.Medium
                 font.features: { "tnum": 1 }
@@ -143,6 +145,7 @@ Item {
             Layout.alignment: Qt.AlignHCenter
             Layout.maximumWidth: cell.ringSize + 18
             text: cell.device ? cell.device.name : ""
+            color: cell.fgColor
             font: Kirigami.Theme.smallFont
             opacity: 0.72
             elide: Text.ElideRight

@@ -52,7 +52,7 @@ PlasmoidItem {
         implicitWidth: root.inPanel
             ? Math.ceil(panelRow.implicitWidth) + Math.round(height * 0.24) * 2
             : Math.max(160, cardIdealW)
-        implicitHeight: root.inPanel ? 32 : Math.max(110, cardIdealH)
+        implicitHeight: root.inPanel ? 32 : Math.max(110, Math.max(cardIdealH, desktopFlow.implicitHeight + pad * 2))
 
         Layout.preferredWidth: implicitWidth
         Layout.minimumWidth: root.inPanel ? implicitWidth : 130
