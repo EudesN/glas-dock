@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0 http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="showLaptop" type="Bool"><default>true</default></entry>
+    <entry name="showPeripherals" type="Bool"><default>true</default></entry>
+    <entry name="showBluetooth" type="Bool"><default>true</default></entry>
+    <entry name="showDeviceNames" type="Bool"><default>false</default></entry>
+    <entry name="useAccentColor" type="Bool"><default>false</default></entry>
+    <entry name="ringSize" type="Int"><default>62</default></entry>
+    <entry name="showCard" type="Bool"><default>true</default></entry>
+    <entry name="cardStyle" type="Int"><default>0</default></entry>
+    <entry name="themeMode" type="Int"><default>0</default></entry>
+    <entry name="cardOpacity" type="Double"><default>0.26</default></entry>
+    <entry name="cardRadius" type="Int"><default>26</default></entry>
+    <entry name="blurBehind" type="Bool"><default>true</default></entry>
+    <entry name="blurFrost" type="Double"><default>0.12</default></entry>
+    <entry name="showBorder" type="Bool"><default>false</default></entry>
+    <entry name="showShadow" type="Bool"><default>true</default></entry>
+    <entry name="popupGap" type="Int"><default>2</default></entry>
+    <entry name="popupAnimation" type="Bool"><default>true</default></entry>
+    <entry name="popupMorph" type="Bool"><default>false</default></entry>
+  </group>
+</kcfg>

@@ -1,0 +1,20 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "EudesN"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Glass battery widget showing laptop and wireless peripheral charge rings, from the Glasdock project",
+        "Icon": "battery",
+        "Id": "com.github.eudesn.glasbattery",
+        "License": "GPL-2.0+",
+        "Name": "Glasbattery",
+        "Version": "0.6.0-alpha.1",
+        "Website": "https://github.com/EudesN/glas-dock",
+        "BugReportUrl": "https://github.com/EudesN/glas-dock/issues"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
