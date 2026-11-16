@@ -11,6 +11,7 @@ KCM.SimpleKCM {
     property alias cfg_clockStyle: clockStyle.currentIndex
     property alias cfg_timeFormat: timeFormat.currentIndex
     property alias cfg_alignment: alignment.currentIndex
+    property alias cfg_glassNumerals: glassNumerals.checked
     property alias cfg_showSeconds: showSeconds.checked
     property alias cfg_showDate: showDate.checked
     property alias cfg_showWeekday: showWeekday.checked
@@ -46,6 +47,7 @@ KCM.SimpleKCM {
             enabled: clockStyle.currentIndex !== 2
             model: ["Left", "Center", "Right"]
         }
+        QQC2.CheckBox { id: glassNumerals; text: "Glass numerals effect"; enabled: clockStyle.currentIndex !== 2 }
         QQC2.CheckBox { id: showSeconds; text: "Show seconds" }
         QQC2.CheckBox { id: accentSeconds; text: "Highlight seconds with accent color"; enabled: showSeconds.checked }
         QQC2.CheckBox { id: showDate; Kirigami.FormData.label: "Details:"; text: "Show the date" }

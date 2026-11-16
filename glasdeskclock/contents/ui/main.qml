@@ -165,17 +165,16 @@ PlasmoidItem {
 
                 RowLayout {
                     Layout.alignment: desk.hAlign
-                    spacing: Math.max(4, Math.round(inner.baseDigitPx * 0.12))
+                    spacing: Math.max(4, Math.round(inner.baseDigitPx * 0.08))
 
-                    PC3.Label {
+                    GlassNumeral {
                         text: root.formattedHm(root.now)
-                        font.pixelSize: Math.round(inner.baseDigitPx)
-                        font.weight: Font.Bold
-                        font.features: { "tnum": 1 }
-                        font.letterSpacing: -1.5
-                        lineHeight: 0.88
-                        style: root.cfg.showCard ? Text.Normal : Text.Raised
-                        styleColor: desk.dropTint
+                        pixelSize: Math.round(inner.baseDigitPx)
+                        fontWeight: Font.Bold
+                        isDark: root.isDark
+                        glassEffect: root.cfg.glassNumerals
+                        dropShadow: true
+                        shadowColor: desk.dropTint
                     }
 
                     ColumnLayout {
@@ -186,16 +185,16 @@ PlasmoidItem {
                         PC3.Label {
                             visible: root.formattedAmPm(root.now).length > 0
                             text: root.formattedAmPm(root.now)
-                            font.pixelSize: Math.max(10, Math.round(inner.baseDigitPx * 0.22))
+                            font.pixelSize: Math.max(10, Math.round(inner.baseDigitPx * 0.20))
                             font.weight: Font.DemiBold
-                            opacity: 0.7
+                            opacity: 0.72
                             style: root.cfg.showCard ? Text.Normal : Text.Raised
                             styleColor: desk.dropTint
                         }
                         PC3.Label {
                             visible: root.cfg.showSeconds
                             text: ":" + root.formattedSeconds(root.now)
-                            font.pixelSize: Math.max(12, Math.round(inner.baseDigitPx * 0.34))
+                            font.pixelSize: Math.max(12, Math.round(inner.baseDigitPx * 0.32))
                             font.weight: Font.Medium
                             font.features: { "tnum": 1 }
                             color: root.cfg.accentSeconds ? root.accent : Kirigami.Theme.textColor
@@ -217,30 +216,29 @@ PlasmoidItem {
 
                 Item { Layout.fillHeight: true }
 
-                PC3.Label {
+                GlassNumeral {
                     Layout.alignment: desk.hAlign
                     text: root.formattedHours(root.now)
-                    font.pixelSize: Math.round(inner.baseDigitPx)
-                    font.weight: Font.Bold
-                    font.features: { "tnum": 1 }
-                    lineHeight: 0.88
-                    style: root.cfg.showCard ? Text.Normal : Text.Raised
-                    styleColor: desk.dropTint
+                    pixelSize: Math.round(inner.baseDigitPx)
+                    fontWeight: Font.Bold
+                    isDark: root.isDark
+                    glassEffect: root.cfg.glassNumerals
+                    dropShadow: true
+                    shadowColor: desk.dropTint
                 }
 
                 RowLayout {
                     Layout.alignment: desk.hAlign
                     spacing: Math.max(4, Math.round(inner.baseDigitPx * 0.12))
 
-                    PC3.Label {
+                    GlassNumeral {
                         text: root.formattedMinutes(root.now)
-                        font.pixelSize: Math.round(inner.baseDigitPx)
-                        font.weight: Font.Light
-                        font.features: { "tnum": 1 }
-                        lineHeight: 0.9
-                        opacity: 0.88
-                        style: root.cfg.showCard ? Text.Normal : Text.Raised
-                        styleColor: desk.dropTint
+                        pixelSize: Math.round(inner.baseDigitPx)
+                        fontWeight: Font.DemiBold
+                        isDark: root.isDark
+                        glassEffect: root.cfg.glassNumerals
+                        dropShadow: true
+                        shadowColor: desk.dropTint
                     }
                     ColumnLayout {
                         visible: root.cfg.showSeconds || root.formattedAmPm(root.now).length > 0

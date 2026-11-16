@@ -6,7 +6,8 @@
   <group name="General">
     <entry name="clockStyle" type="Int"><default>0</default></entry>
     <entry name="timeFormat" type="Int"><default>0</default></entry>
-    <entry name="alignment" type="Int"><default>0</default></entry>
+    <entry name="alignment" type="Int"><default>1</default></entry>
+    <entry name="glassNumerals" type="Bool"><default>true</default></entry>
     <entry name="showSeconds" type="Bool"><default>false</default></entry>
     <entry name="showDate" type="Bool"><default>true</default></entry>
     <entry name="showWeekday" type="Bool"><default>true</default></entry>
