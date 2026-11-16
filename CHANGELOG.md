@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.7.0-alpha.1
+
+Project
+- Renamed the project to **GlasDo** (custom glass widgets for KDE Plasma 6) and
+  updated the README and widget descriptions.
+
+Glass, blur and themes
+- Fixed `ThemeScope` reading `#000000` accent on hidden/unattached items by
+  reading live palette colors from `SystemPalette` (`Follow system`, `Dark`,
+  `Light` now resolve proper accent and contrast colors everywhere).
+- Refined `GlassSurface` for real KWin blur (`Glass` and `Frosted` no longer
+  apply extra opaque dark tint or milky 18% white haze when real blur is active)
+  and removed default white borders across the dock, popups, tiles, pills and
+  cards (`showBorder` off by default; internal veil/sheen layers flush with the
+  rounded edge so there is no 1 px ring).
+- `BlurBehind` (`org.glasdock.blur`): inward pixel snapping with 0.5 px corner
+  inset so KWin's un-antialiased blur region never peeks outside rounded edges,
+  plus visibility/activation refresh tracking.
+- Unified **Blur behind** (`On` / `Off`), **Frost** and **Blur strength** controls
+  across Glasdock, Glasplayer, Glasweather and Glasclock settings.
+
+Dock, launcher and panel widgets
+- **Glasdock**: keeps the auto-hiding panel open (`RequiresAttentionStatus`)
+  while live window previews or context menus are active; integer minimum width
+  to avoid sub-pixel dock centering; Launcher adds a subtle horizontal divider
+  separating *Favorites* and *All Applications* from the remaining categories.
+- **Glasclock**: light directional slide/fade transitions when switching months,
+  smooth agenda fade and selection ring animation on date change, uniform day
+  text color across the month, and a clean bold borderless circle for today.
+- **Glasplayer** & dock player tile: auto-hide when no media is active or
+  queued instead of showing "Nothing playing" (also includes
+  `experimental/popup-morph` option in panel widgets).
+
 ## 0.6.0-alpha.1
 
 New widgets

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Glasdock — install or update the widgets of this repository.
+# GlasDo — install or update the widgets of this repository.
 #
 #   ./install.sh                    sync shared code and install/update every widget
 #   ./install.sh glasplayer         only the given widget(s)

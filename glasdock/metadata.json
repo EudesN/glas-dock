@@ -7,12 +7,12 @@
             }
         ],
         "Category": "Windows and Tasks",
-        "Description": "macOS-style dock with icon zoom, glass background and app launcher",
+        "Description": "Custom glass dock for KDE Plasma with icon zoom, glass background and app launcher, from the GlasDo project",
         "Icon": "preferences-system-windows",
         "Id": "com.github.eudesn.glasdock",
         "License": "GPL-2.0+",
         "Name": "Glasdock",
-        "Version": "0.6.0-alpha.1",
+        "Version": "0.7.0-alpha.1",
         "Website": "https://github.com/EudesN/glas-dock",
         "BugReportUrl": "https://github.com/EudesN/glas-dock/issues"
     },

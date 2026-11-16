@@ -1,7 +1,8 @@
-# Glasdock
+# GlasDo
 
-A macOS-style dock for KDE Plasma 6, plus matching panel widgets, written as
-plain QML plasmoids.
+Custom glass widgets for KDE Plasma 6 — a dock and matching panel widgets,
+written as plain QML plasmoids. *(The name **GlasDo** blends "Glass" with
+"Do": custom glass widgets built to get things done.)*
 
 | Widget | What it is |
 | --- | --- |

@@ -7,12 +7,12 @@
             }
         ],
         "Category": "Environment and Weather",
-        "Description": "Weather for the panel with a glass forecast panel, from the Glasdock project",
+        "Description": "Weather for the panel with a glass forecast panel, from the GlasDo project",
         "Icon": "weather-few-clouds",
         "Id": "com.github.eudesn.glasweather",
         "License": "GPL-2.0+",
         "Name": "Glasweather",
-        "Version": "0.6.0-alpha.1",
+        "Version": "0.7.0-alpha.1",
         "Website": "https://github.com/EudesN/glas-dock",
         "BugReportUrl": "https://github.com/EudesN/glas-dock/issues"
     },
