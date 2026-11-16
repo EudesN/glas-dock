@@ -10,6 +10,8 @@ KCM.SimpleKCM {
     property alias cfg_showPeripherals: showPeripherals.checked
     property alias cfg_showBluetooth: showBluetooth.checked
     property alias cfg_showDeviceNames: showDeviceNames.checked
+    property alias cfg_showPlaceholder: showPlaceholder.checked
+    property alias cfg_showPercentSymbol: showPercentSymbol.checked
     property alias cfg_useAccentColor: useAccentColor.checked
     property alias cfg_ringSize: ringSize.value
 
@@ -37,6 +39,8 @@ KCM.SimpleKCM {
             text: "Bluetooth audio devices (headphones, earbuds)"
         }
         QQC2.CheckBox { id: showDeviceNames; text: "Device names under percentages" }
+        QQC2.CheckBox { id: showPlaceholder; text: "Placeholder slot when only 1 device is connected" }
+        QQC2.CheckBox { id: showPercentSymbol; text: "Show % symbol next to numbers" }
         QQC2.CheckBox { id: useAccentColor; Kirigami.FormData.label: "Ring color:"; text: "Use the system accent color instead of battery green" }
 
         QQC2.SpinBox {

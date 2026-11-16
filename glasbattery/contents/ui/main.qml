@@ -42,21 +42,29 @@ PlasmoidItem {
 
         Shared.ThemeScope { target: view; themeMode: root.cfg.themeMode }
 
-        readonly property real pad: Math.round(Kirigami.Units.gridUnit * 0.9)
-        readonly property real cellGap: Math.round(Kirigami.Units.gridUnit * 0.85)
-        readonly property int visibleCount: Math.max(1, batSource.count)
-        readonly property real cardIdealW: visibleCount * (root.cfg.ringSize + 10)
-            + Math.max(0, visibleCount - 1) * cellGap + pad * 2
-        readonly property real cardIdealH: (root.cfg.ringSize + 44 + (root.cfg.showDeviceNames ? 18 : 0)) + pad * 2
+        readonly property var desktopDeviceList: {
+            const list = batSource.devices.slice();
+            if (list.length === 1 && root.cfg.showPlaceholder)
+                list.push({ empty: true });
+            return list;
+        }
+
+        readonly property real padH: Math.round(Kirigami.Units.gridUnit * 1.3)
+        readonly property real padV: Math.round(Kirigami.Units.gridUnit * 0.75)
+        readonly property real cellGap: Math.round(Kirigami.Units.gridUnit * 1.1)
+        readonly property int visibleCount: Math.max(1, desktopDeviceList.length)
+        readonly property real cardIdealW: visibleCount * root.cfg.ringSize
+            + Math.max(0, visibleCount - 1) * cellGap + padH * 2
+        readonly property real cardIdealH: (root.cfg.ringSize + (root.cfg.showDeviceNames ? 18 : 0)) + padV * 2
 
         implicitWidth: root.inPanel
             ? Math.ceil(panelRow.implicitWidth) + Math.round(height * 0.24) * 2
             : Math.max(160, cardIdealW)
-        implicitHeight: root.inPanel ? 32 : Math.max(110, Math.max(cardIdealH, desktopFlow.implicitHeight + pad * 2))
+        implicitHeight: root.inPanel ? 32 : Math.max(88, Math.max(cardIdealH, desktopFlow.implicitHeight + padV * 2))
 
         Layout.preferredWidth: implicitWidth
         Layout.minimumWidth: root.inPanel ? implicitWidth : 130
-        Layout.minimumHeight: root.inPanel ? 0 : 96
+        Layout.minimumHeight: root.inPanel ? 0 : 80
         Layout.fillHeight: root.inPanel
 
         // ============================================================ DESKTOP
@@ -69,7 +77,7 @@ PlasmoidItem {
                 visible: root.cfg.showCard
                 style: root.cfg.cardStyle
                 backgroundOpacity: root.cfg.cardOpacity
-                radius: root.cfg.cardRadius
+                radius: Math.min(height / 2, Math.max(root.cfg.cardRadius, height / 2))
                 isDark: root.isDark
                 accent: root.accent
                 showBorder: root.cfg.showBorder
@@ -81,16 +89,17 @@ PlasmoidItem {
             Flow {
                 id: desktopFlow
                 anchors.centerIn: parent
-                width: Math.min(implicitWidth, Math.max(1, parent.width - view.pad * 2))
+                width: Math.min(implicitWidth, Math.max(1, parent.width - view.padH * 2))
                 spacing: view.cellGap
 
                 Repeater {
-                    model: batSource.devices
+                    model: view.desktopDeviceList
                     delegate: BatteryRing {
                         required property var modelData
                         device: modelData
                         ringSize: root.cfg.ringSize
                         showDeviceName: root.cfg.showDeviceNames
+                        showPercentSymbol: root.cfg.showPercentSymbol
                         useAccentColor: root.cfg.useAccentColor
                         isDark: root.isDark
                         accent: root.accent
@@ -189,6 +198,7 @@ PlasmoidItem {
                                 device: modelData
                                 ringSize: root.cfg.ringSize
                                 showDeviceName: true
+                                showPercentSymbol: root.cfg.showPercentSymbol
                                 useAccentColor: root.cfg.useAccentColor
                                 isDark: root.isDark
                                 accent: root.accent
