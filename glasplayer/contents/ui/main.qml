@@ -157,15 +157,16 @@ PlasmoidItem {
             }
         }
 
+        Connections {
+            target: root
+            function onHiddenChanged() {
+                if (root.hidden && popup.visible)
+                    popup.close();
+            }
+        }
+
         Shared.GlassPopup {
             id: popup
-            Connections {
-                target: root
-                function onHiddenChanged() {
-                    if (root.hidden && popup.visible)
-                        popup.close();
-                }
-            }
             anchorItem: compact
             edge: Plasmoid.location
             gap: root.cfg.popupGap

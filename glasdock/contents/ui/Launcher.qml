@@ -310,6 +310,11 @@ Item {
                 color: view.isDark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.12)
             }
 
+            FontMetrics {
+                id: cellFontMetrics
+                font.pixelSize: Math.round(Kirigami.Theme.defaultFont.pixelSize * 0.92)
+            }
+
             // ----------------------------------------------------------- apps
             GridView {
                 id: grid
@@ -317,20 +322,32 @@ Item {
                 Layout.fillHeight: true
                 // a little room after the category separator
                 Layout.leftMargin: view.searching ? 0 : Kirigami.Units.smallSpacing
+                topMargin: 2
+                bottomMargin: 2
                 clip: true
                 model: view.gridModel
                 keyNavigationWraps: true
-                readonly property int columns: Math.max(1, Math.floor(width / (view.iconSize * 2.2)))
+
+                readonly property int boxMargin: 3
+                readonly property int hoverHeadroom: Math.ceil(view.iconSize * 0.04)
+                readonly property int cardTopPad: Kirigami.Units.smallSpacing + 4 + hoverHeadroom
+                readonly property int cardBottomPad: Kirigami.Units.smallSpacing + 2
+                readonly property int cardSidePad: Kirigami.Units.smallSpacing * 2
+                readonly property int iconLabelGap: Kirigami.Units.smallSpacing + 1
+                readonly property int labelHeight: Math.ceil(cellFontMetrics.lineSpacing * 2)
+
+                readonly property real minCellWidth: Math.max(view.iconSize * 2.2, Kirigami.Units.gridUnit * 5.2)
+                readonly property int columns: Math.max(1, Math.floor(width / minCellWidth))
                 cellWidth: Math.floor(width / columns)
-                cellHeight: view.iconSize + Kirigami.Units.gridUnit * 3
+                cellHeight: boxMargin * 2 + cardTopPad + view.iconSize + iconLabelGap + labelHeight + cardBottomPad
                 highlightMoveDuration: 0
                 highlight: Item {
                     width: grid.cellWidth
                     height: grid.cellHeight
                     Rectangle {
                         anchors.fill: parent
-                        anchors.margins: 3
-                        radius: Math.round(Kirigami.Units.cornerRadius * 1.8)
+                        anchors.margins: grid.boxMargin
+                        radius: Math.round(Kirigami.Units.cornerRadius * 2.0)
                         color: view.isDark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(1, 1, 1, 0.52)
                         border.width: 1
                         border.color: Qt.rgba(view.accent.r, view.accent.g, view.accent.b, 0.55)
@@ -363,11 +380,11 @@ Item {
 
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.topMargin: Kirigami.Units.smallSpacing
-                        anchors.bottomMargin: Kirigami.Units.smallSpacing
-                        anchors.leftMargin: Kirigami.Units.smallSpacing
-                        anchors.rightMargin: Kirigami.Units.smallSpacing
-                        spacing: Kirigami.Units.smallSpacing
+                        anchors.topMargin: grid.boxMargin + grid.cardTopPad
+                        anchors.bottomMargin: grid.boxMargin + grid.cardBottomPad
+                        anchors.leftMargin: grid.boxMargin + grid.cardSidePad
+                        anchors.rightMargin: grid.boxMargin + grid.cardSidePad
+                        spacing: grid.iconLabelGap
 
                         Kirigami.Icon {
                             Layout.alignment: Qt.AlignHCenter
@@ -382,6 +399,7 @@ Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             text: cell.model.display ?? ""
+                            font.pixelSize: cellFontMetrics.font.pixelSize
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignTop
                             wrapMode: Text.Wrap
