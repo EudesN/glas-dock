@@ -23,7 +23,10 @@ KCM.SimpleKCM {
     property alias cfg_blurFrost: blurFrost.value
     property alias cfg_showBorder: showBorder.checked
     property alias cfg_showShadow: showShadow.checked
+    property alias cfg_pillBackground: pillBackground.checked
+    property alias cfg_panelCompact: panelCompact.checked
     property alias cfg_popupGap: popupGap.value
+    property alias cfg_popupRadius: popupRadius.value
     property alias cfg_popupAnimation: popupAnimation.checked
     property alias cfg_popupMorph: popupMorph.checked
 
@@ -120,8 +123,17 @@ KCM.SimpleKCM {
             onNewData: sourceName => disconnectSource(sourceName)
         }
 
-        Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Panel popup" }
+        Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Status bar & popup" }
 
+        QQC2.CheckBox { id: pillBackground; Kirigami.FormData.label: "Status bar:"; text: "Glass pill background" }
+        QQC2.CheckBox { id: panelCompact; text: "Compact mode (primary device + count badge)" }
+        QQC2.SpinBox {
+            id: popupRadius
+            Kirigami.FormData.label: "Popup corner radius:"
+            from: 0; to: 48
+            textFromValue: v => v + " px"
+            valueFromText: t => parseInt(t)
+        }
         QQC2.SpinBox {
             id: popupGap
             Kirigami.FormData.label: "Distance from the widget:"

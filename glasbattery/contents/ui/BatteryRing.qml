@@ -93,7 +93,7 @@ Item {
                     capStyle: ShapePath.RoundCap
                     PathAngleArc {
                         centerX: cell.ringSize / 2
-                        centerY: cell.ringSize * 0.44
+                        centerY: cell.ringSize * 0.50
                         radiusX: cell.radiusPx
                         radiusY: cell.radiusPx
                         startAngle: cell.startAngle
@@ -109,7 +109,7 @@ Item {
                     capStyle: ShapePath.RoundCap
                     PathAngleArc {
                         centerX: cell.ringSize / 2
-                        centerY: cell.ringSize * 0.44
+                        centerY: cell.ringSize * 0.50
                         radiusX: cell.radiusPx
                         radiusY: cell.radiusPx
                         startAngle: cell.startAngle
@@ -122,8 +122,8 @@ Item {
             Kirigami.Icon {
                 visible: cell.device && cell.device.iconSource
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: Math.round(cell.ringSize * 0.44 - height * 0.5 - cell.ringSize * 0.05)
-                width: Math.round(cell.ringSize * 0.35)
+                y: Math.round(cell.ringSize * 0.50 - height * 0.5 - cell.ringSize * 0.04)
+                width: Math.round(cell.ringSize * 0.34)
                 height: width
                 source: cell.device ? cell.device.iconSource : ""
                 isMask: true
@@ -134,7 +134,7 @@ Item {
             // Charge bolt and percentage in the bottom opening between the tips
             RowLayout {
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: Math.round(cell.ringSize * 0.44 + cell.radiusPx * 0.52)
+                y: Math.round(cell.ringSize * 0.50 + cell.radiusPx * 0.50)
                 spacing: 2
 
                 Kirigami.Icon {

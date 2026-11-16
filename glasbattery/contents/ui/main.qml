@@ -1,8 +1,8 @@
 /*
- * Glasbattery — glass battery widget for desktop or panel (Glasdock project).
- * Shows circular battery rings for the laptop and connected peripherals
- * (Bluetooth headphones/earbuds, mice, keyboards, touchpads, controllers) and
- * adapts automatically as devices connect or disconnect.
+ * Glasbattery — glass battery widget for desktop or status bar / panel (GlasDo project).
+ * Shows horseshoe battery gauges on the desktop (and panel popup), and a compact
+ * status-bar pill with connected laptop and wireless/USB peripherals (mouse,
+ * keyboard, Bluetooth headphones/earbuds, controllers).
  */
 import QtQuick
 import QtQuick.Layouts
@@ -30,34 +30,87 @@ PlasmoidItem {
     readonly property bool isDark: themeScope.isDark
     readonly property color accent: themeScope.accent
 
+    function formatRemaining(ms) {
+        if (!ms || ms <= 60000)
+            return "";
+        const mins = Math.round(ms / 60000);
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return h > 0 ? (h + "h " + m + "m") : (m + "m");
+    }
+
+    function levelColor(dev) {
+        if (!dev)
+            return Kirigami.Theme.textColor;
+        const charging = dev.charging === true;
+        if (dev.percent <= 10 && !charging)
+            return "#ff453a";
+        if (dev.percent <= 20 && !charging)
+            return "#ff9f0a";
+        return Kirigami.Theme.textColor;
+    }
+
     preferredRepresentation: fullRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
-    toolTipMainText: batSource.primaryDevice
-        ? batSource.primaryDevice.name + " · " + batSource.primaryDevice.percent + "%"
-        : "No battery devices"
-    toolTipSubText: batSource.count > 1 ? (batSource.count + " devices connected") : ""
+    toolTipMainText: {
+        if (!batSource.hasDevices)
+            return "No battery devices";
+        return batSource.devices.slice(0, 3)
+            .map(d => d.name + " · " + d.percent + "%" + (d.charging ? " ⚡" : ""))
+            .join("   |   ");
+    }
+    toolTipSubText: {
+        if (!batSource.primaryDevice)
+            return "";
+        if (batSource.primaryDevice.charging)
+            return "Charging";
+        const rem = formatRemaining(batSource.primaryDevice.remainingMsec);
+        if (rem)
+            return rem + " remaining";
+        return batSource.count > 1 ? (batSource.count + " devices connected") : "";
+    }
 
     fullRepresentation: Item {
         id: view
 
         Shared.ThemeScope { target: view; themeMode: root.cfg.themeMode }
 
-        readonly property real padH: Math.round(Kirigami.Units.gridUnit * 1.2)
-        readonly property real padV: Math.round(Kirigami.Units.gridUnit * 0.8)
-        readonly property real cellGap: Math.round(Kirigami.Units.gridUnit * 1.0)
+        readonly property real padV: Math.max(12, Math.round(root.cfg.ringSize * 0.22))
+        readonly property real padH: Math.max(18, Math.round(root.cfg.ringSize * 0.30))
+        readonly property real cellGap: Math.max(12, Math.round(root.cfg.ringSize * 0.22))
+        readonly property real barH: height > 0 ? height : 32
+        readonly property real panelPad: Math.max(3, Math.round(barH * 0.12))
         readonly property int visibleCount: Math.max(1, batSource.count)
+        readonly property int nameExtraH: root.cfg.showDeviceNames ? 18 : 0
         readonly property real cardIdealW: visibleCount * root.cfg.ringSize
             + Math.max(0, visibleCount - 1) * cellGap + padH * 2
-        readonly property real cardIdealH: root.cfg.ringSize + (root.cfg.showDeviceNames ? 18 : 0) + padV * 2
+        readonly property real cardIdealH: root.cfg.ringSize + nameExtraH + padV * 2
+
+        // If Plasma's desktop container is narrower/shorter than cardIdealW/H,
+        // scale gauges down smoothly so they never overflow outside the glass pill.
+        readonly property real desktopAvailW: Math.max(40, width - padH * 2)
+        readonly property real desktopAvailH: Math.max(40, height - padV * 2 - nameExtraH)
+        readonly property real fitScale: (!root.inPanel && width > 0 && height > 0)
+            ? Math.min(1.0,
+                       desktopAvailW / Math.max(1, visibleCount * root.cfg.ringSize + Math.max(0, visibleCount - 1) * cellGap),
+                       desktopAvailH / Math.max(1, root.cfg.ringSize))
+            : 1.0
+        readonly property real effectiveRingSize: Math.max(36, Math.floor(root.cfg.ringSize * fitScale))
+        readonly property real effectiveCellGap: Math.max(8, Math.round(effectiveRingSize * 0.22))
+
+        readonly property int panelMaxShown: root.cfg.panelCompact ? 1 : 3
+        readonly property var panelDevices: batSource.devices.slice(0, panelMaxShown)
+        readonly property int panelOverflow: Math.max(0, batSource.count - panelDevices.length)
 
         implicitWidth: root.inPanel
-            ? Math.ceil(panelRow.implicitWidth) + Math.round(height * 0.24) * 2
+            ? Math.ceil(panelRow.implicitWidth) + panelPad * (root.cfg.pillBackground ? 4 : 2) + 4
             : cardIdealW
         implicitHeight: root.inPanel ? 32 : cardIdealH
 
         Layout.preferredWidth: implicitWidth
-        Layout.minimumWidth: root.inPanel ? implicitWidth : (root.cfg.ringSize + padH * 2)
-        Layout.minimumHeight: root.inPanel ? 0 : (root.cfg.ringSize + padV * 2)
+        Layout.minimumWidth: root.inPanel ? Layout.preferredWidth : cardIdealW
+        Layout.maximumWidth: root.inPanel ? Layout.preferredWidth : Number.POSITIVE_INFINITY
+        Layout.minimumHeight: root.inPanel ? 0 : cardIdealH
         Layout.fillHeight: root.inPanel
 
         // ============================================================ DESKTOP
@@ -82,14 +135,14 @@ PlasmoidItem {
             Row {
                 id: desktopRow
                 anchors.centerIn: parent
-                spacing: view.cellGap
+                spacing: view.effectiveCellGap
 
                 Repeater {
                     model: batSource.devices
                     delegate: BatteryRing {
                         required property var modelData
                         device: modelData
-                        ringSize: root.cfg.ringSize
+                        ringSize: view.effectiveRingSize
                         showDeviceName: root.cfg.showDeviceNames
                         showPercentSymbol: root.cfg.showPercentSymbol
                         useAccentColor: root.cfg.useAccentColor
@@ -107,10 +160,23 @@ PlasmoidItem {
             }
         }
 
-        // ============================================================== PANEL
+        // =================================================== STATUS BAR / PANEL
         Item {
             visible: root.inPanel
             anchors.fill: parent
+
+            // Glass pill matching Glasclock / Glasweather / Glasplayer
+            Rectangle {
+                visible: root.cfg.pillBackground
+                anchors.fill: parent
+                anchors.topMargin: view.panelPad / 2
+                anchors.bottomMargin: view.panelPad / 2
+                radius: height / 2
+                color: root.isDark ? Qt.rgba(1, 1, 1, panelArea.containsMouse ? 0.14 : 0.08)
+                                   : Qt.rgba(1, 1, 1, panelArea.containsMouse ? 0.6 : 0.4)
+                border.width: popup.visible && !popup.closing ? 1 : 0
+                border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.6)
+            }
 
             MouseArea {
                 id: panelArea
@@ -122,32 +188,59 @@ PlasmoidItem {
             RowLayout {
                 id: panelRow
                 anchors.centerIn: parent
-                spacing: Math.round(view.height * 0.22)
+                spacing: Math.max(6, Math.round(view.barH * 0.22))
 
                 Repeater {
-                    model: batSource.devices.slice(0, 3)
+                    model: view.panelDevices
                     delegate: RowLayout {
+                        id: chip
+                        required property int index
                         required property var modelData
+                        readonly property color stateColor: root.levelColor(modelData)
                         spacing: 4
-                        Kirigami.Icon {
-                            Layout.preferredWidth: Math.round(view.height * 0.56)
-                            Layout.preferredHeight: Layout.preferredWidth
-                            source: modelData.iconSource
-                            isMask: true
+
+                        Rectangle {
+                            visible: chip.index > 0
+                            Layout.preferredWidth: 1
+                            Layout.preferredHeight: Math.max(10, Math.round(view.barH * 0.36))
+                            Layout.rightMargin: Math.max(2, Math.round(view.barH * 0.08))
                             color: Kirigami.Theme.textColor
+                            opacity: 0.18
                         }
+
+                        Kirigami.Icon {
+                            Layout.preferredWidth: Math.max(14, Math.round(view.barH * 0.56))
+                            Layout.preferredHeight: Layout.preferredWidth
+                            source: chip.modelData.iconSource
+                            isMask: true
+                            color: chip.stateColor
+                        }
+
+                        Kirigami.Icon {
+                            visible: chip.modelData.charging === true
+                            Layout.preferredWidth: Math.max(9, Math.round(view.barH * 0.34))
+                            Layout.preferredHeight: Layout.preferredWidth
+                            source: Qt.resolvedUrl("icons/bolt.svg")
+                            isMask: true
+                            color: root.cfg.useAccentColor ? root.accent : "#30d158"
+                        }
+
                         PC3.Label {
-                            text: modelData.percent + "%"
+                            text: chip.modelData.percent + "%"
+                            color: chip.stateColor
                             font.weight: Font.DemiBold
                             font.features: { "tnum": 1 }
                         }
                     }
                 }
+
                 PC3.Label {
-                    visible: batSource.count > 3
-                    text: "+" + (batSource.count - 3)
-                    opacity: 0.65
+                    visible: view.panelOverflow > 0
+                    text: "+" + view.panelOverflow
+                    font: Kirigami.Theme.smallFont
+                    opacity: 0.68
                 }
+
                 PC3.Label {
                     visible: !batSource.hasDevices
                     text: "--%"
@@ -164,7 +257,7 @@ PlasmoidItem {
                 screenGeometry: Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0)
                 style: root.cfg.cardStyle
                 backgroundOpacity: root.cfg.cardOpacity
-                radius: root.cfg.cardRadius
+                radius: root.cfg.popupRadius
                 themeMode: root.cfg.themeMode
                 isDark: root.isDark
                 accent: root.accent
@@ -172,35 +265,69 @@ PlasmoidItem {
                 blurBehind: root.cfg.blurBehind
                 frost: root.cfg.blurFrost
                 sourceComponent: Item {
-                    readonly property int count: Math.max(1, batSource.count)
-                    implicitWidth: Math.max(120, count * root.cfg.ringSize
-                        + Math.max(0, count - 1) * view.cellGap + view.padH * 2)
-                    implicitHeight: Math.max(70, root.cfg.ringSize + 18 + view.padV * 2)
+                    readonly property var primary: batSource.primaryDevice
+                    readonly property string statusSummary: {
+                        if (!primary)
+                            return "";
+                        if (primary.charging)
+                            return "Charging";
+                        const rem = root.formatRemaining(primary.remainingMsec);
+                        if (rem)
+                            return rem + " left";
+                        return primary.percent >= 99 ? "Full" : "";
+                    }
+                    implicitWidth: Math.max(Kirigami.Units.gridUnit * 12, popupCol.implicitWidth)
+                    implicitHeight: popupCol.implicitHeight
 
-                    Row {
-                        id: popupRow
-                        anchors.centerIn: parent
-                        spacing: view.cellGap
-                        Repeater {
-                            model: batSource.devices
-                            delegate: BatteryRing {
-                                required property var modelData
-                                device: modelData
-                                ringSize: root.cfg.ringSize
-                                showDeviceName: true
-                                showPercentSymbol: root.cfg.showPercentSymbol
-                                useAccentColor: root.cfg.useAccentColor
-                                isDark: root.isDark
-                                accent: root.accent
+                    ColumnLayout {
+                        id: popupCol
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        spacing: Kirigami.Units.largeSpacing
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.largeSpacing
+
+                            PC3.Label {
+                                text: "Battery"
+                                font.weight: Font.DemiBold
+                            }
+                            Item { Layout.fillWidth: true }
+                            PC3.Label {
+                                visible: statusSummary.length > 0
+                                text: statusSummary
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.65
                             }
                         }
-                    }
 
-                    PC3.Label {
-                        anchors.centerIn: parent
-                        visible: !batSource.hasDevices
-                        text: "No battery devices connected"
-                        opacity: 0.6
+                        Row {
+                            id: popupRow
+                            visible: batSource.hasDevices
+                            Layout.alignment: Qt.AlignHCenter
+                            spacing: view.cellGap
+                            Repeater {
+                                model: batSource.devices
+                                delegate: BatteryRing {
+                                    required property var modelData
+                                    device: modelData
+                                    ringSize: root.cfg.ringSize
+                                    showDeviceName: true
+                                    showPercentSymbol: root.cfg.showPercentSymbol
+                                    useAccentColor: root.cfg.useAccentColor
+                                    isDark: root.isDark
+                                    accent: root.accent
+                                }
+                            }
+                        }
+
+                        PC3.Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            visible: !batSource.hasDevices
+                            text: "No battery devices connected"
+                            opacity: 0.6
+                        }
                     }
                 }
             }

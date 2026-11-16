@@ -1,13 +1,14 @@
 /*
  * Glasbattery — live battery and peripheral device model.
  * Combines KDE PowerDevil's BatteryControlModel (laptop + UPower/HID++ mice,
- * keyboards, touchpads, controllers, headsets) with BluezQt.DevicesModel so
- * connecting/disconnecting Bluetooth peripherals updates immediately and every
- * device gets a specific peripheral kind and icon.
+ * keyboards, touchpads, controllers, headsets), BluezQt.DevicesModel, and a
+ * direct USB HID battery probe (for 2.4GHz dongles/wired mice like Delux M400)
+ * so connecting/disconnecting peripherals updates automatically.
  */
 import QtQuick
 import org.kde.plasma.private.battery as Battery
 import org.kde.bluezqt as BluezQt
+import org.kde.plasma.plasma5support as P5Support
 
 Item {
     id: source
@@ -18,6 +19,10 @@ Item {
 
     // [{ key, name, kind, iconSource, percent, charging, isLaptop, remainingMsec }]
     property var devices: []
+    property var usbDevices: []
+    property string usbActiveCmd: ""
+    property double usbLastProbeAt: 0
+    readonly property string usbScriptPath: Qt.resolvedUrl("../scripts/usb_battery.py").toString().replace(/^file:\/\//, "")
     readonly property int count: devices.length
     readonly property bool hasDevices: count > 0
     readonly property var primaryDevice: count > 0 ? devices[0] : null
@@ -27,7 +32,13 @@ Item {
     height: 0
 
     onShowLaptopChanged: scheduleRebuild()
-    onShowPeripheralsChanged: scheduleRebuild()
+    onShowPeripheralsChanged: {
+        if (!showPeripherals)
+            usbDevices = [];
+        else
+            probeUsbPeripherals();
+        scheduleRebuild();
+    }
     onShowBluetoothChanged: scheduleRebuild()
 
     function iconUrl(kind) {
@@ -138,6 +149,51 @@ Item {
         onObjectRemoved: source.scheduleRebuild()
     }
 
+    function probeUsbPeripherals() {
+        if (!showPeripherals || !usbScriptPath)
+            return;
+        const now = Date.now();
+        if (usbActiveCmd !== "" && now - usbLastProbeAt < 4000)
+            return;
+        if (usbActiveCmd !== "")
+            usbExec.disconnectSource(usbActiveCmd);
+        const cmd = "python3 '" + usbScriptPath.replace(/'/g, "'\\''") + "'";
+        usbActiveCmd = cmd;
+        usbLastProbeAt = now;
+        usbExec.connectSource(cmd);
+    }
+
+    P5Support.DataSource {
+        id: usbExec
+        engine: "executable"
+        connectedSources: []
+        onNewData: (sourceName, data) => {
+            disconnectSource(sourceName);
+            if (source.usbActiveCmd === sourceName)
+                source.usbActiveCmd = "";
+            const stdout = (data && data["stdout"]) ? data["stdout"].trim() : "";
+            let parsed = [];
+            if (stdout.startsWith("[")) {
+                try {
+                    const arr = JSON.parse(stdout);
+                    if (Array.isArray(arr))
+                        parsed = arr;
+                } catch (e) {}
+            }
+            source.usbDevices = parsed;
+            source.scheduleRebuild();
+        }
+    }
+
+    Timer {
+        id: usbPollTimer
+        interval: 15000
+        repeat: true
+        running: source.showPeripherals
+        triggeredOnStart: true
+        onTriggered: source.probeUsbPeripherals()
+    }
+
     Timer {
         id: rebuildTimer
         interval: 40
@@ -215,6 +271,30 @@ Item {
                     iconSource: iconUrl(kind),
                     percent: Math.max(0, Math.min(100, bz.percent)),
                     charging: false,
+                    isLaptop: false,
+                    remainingMsec: 0
+                });
+            }
+        }
+
+        if (showPeripherals) {
+            for (let i = 0; i < usbDevices.length; i++) {
+                const u = usbDevices[i];
+                if (!u || u.percent === undefined || u.percent < 0)
+                    continue;
+                const name = u.name || "USB Mouse";
+                const norm = normalizeName(name);
+                if (seenNorm[norm])
+                    continue;
+                seenNorm[norm] = true;
+                const kind = u.kind || classifyKind("", name, "", false);
+                list.push({
+                    key: u.key || ("usb-" + (norm || i)),
+                    name: name,
+                    kind: kind,
+                    iconSource: iconUrl(kind),
+                    percent: Math.max(0, Math.min(100, Math.round(u.percent))),
+                    charging: u.charging === true,
                     isLaptop: false,
                     remainingMsec: 0
                 });
