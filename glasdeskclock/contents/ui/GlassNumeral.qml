@@ -1,8 +1,9 @@
 /*
- * Glasdeskclock — static-cached translucent glass numeral renderer.
- * Paints only when the displayed text, size or theme changes (once per minute),
- * keeping idle CPU/GPU usage near zero while giving the digits a translucent
- * Liquid Glass fill, subtle diagonal sheen, specular bevel rim and soft shadow.
+ * Glasdeskclock — static-cached 3D Liquid Glass / Solid numeral renderer.
+ * Paints only when the displayed text, size, theme or style changes (once per
+ * minute), keeping idle CPU/GPU usage near zero while rendering sculpted 3D
+ * glass depth: grounded shadow, bottom-right thickness bevel, translucent
+ * frosted core, inner refraction highlight, diagonal sheen and specular rim.
  */
 import QtQuick
 import org.kde.kirigami as Kirigami
@@ -17,17 +18,18 @@ Item {
     property bool isDark: true
     property bool glassEffect: true
     property bool dropShadow: true
+    property color solidColor: Kirigami.Theme.textColor
     property color shadowColor: Qt.rgba(0, 0, 0, 0.45)
 
     readonly property string fontFamily: Kirigami.Theme.defaultFont.family || "sans-serif"
-    readonly property int pad: Math.max(8, Math.round(pixelSize * 0.10))
+    readonly property int pad: Math.max(4, Math.round(pixelSize * 0.08))
     property real measuredWidth: fallback.implicitWidth
 
     implicitWidth: glassEffect
         ? Math.ceil(Math.max(fallback.implicitWidth, measuredWidth)) + pad * 2
         : fallback.implicitWidth
     implicitHeight: glassEffect
-        ? Math.ceil(Math.max(fallback.implicitHeight, pixelSize * 1.12)) + pad * 2
+        ? Math.ceil(Math.max(fallback.implicitHeight, pixelSize * 1.06)) + pad * 2
         : fallback.implicitHeight
 
     PC3.Label {
@@ -35,6 +37,7 @@ Item {
         anchors.centerIn: parent
         visible: !root.glassEffect
         text: root.text
+        color: root.solidColor
         font.pixelSize: root.pixelSize
         font.weight: root.fontWeight
         font.features: { "tnum": 1 }
@@ -93,57 +96,75 @@ Item {
             const cy = h / 2;
             const halfSpan = root.pixelSize * 0.42;
 
-            // 1. Soft drop shadow for contrast without making the glass opaque
+            // 1. Soft grounded drop shadow behind the glass slab
             if (root.dropShadow) {
                 ctx.save();
-                ctx.shadowColor = root.isDark ? "rgba(0, 0, 0, 0.46)" : "rgba(0, 0, 0, 0.22)";
-                ctx.shadowBlur = Math.max(5, Math.round(root.pixelSize * 0.08));
-                ctx.shadowOffsetY = Math.max(2, Math.round(root.pixelSize * 0.025));
-                ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
+                ctx.shadowColor = root.isDark ? "rgba(0, 0, 0, 0.56)" : "rgba(0, 0, 0, 0.32)";
+                ctx.shadowBlur = Math.max(7, Math.round(root.pixelSize * 0.11));
+                ctx.shadowOffsetY = Math.max(2, Math.round(root.pixelSize * 0.038));
+                ctx.fillStyle = "rgba(0, 0, 0, 0.16)";
                 ctx.fillText(root.text, cx, cy);
                 ctx.restore();
             }
 
-            // 2. Translucent frosted glass core
+            // 2. 3D glass thickness / bottom-right depth bevel
+            ctx.save();
+            ctx.lineWidth = Math.max(1.8, root.pixelSize * 0.020);
+            ctx.lineJoin = "round";
+            ctx.strokeStyle = root.isDark ? "rgba(10, 14, 22, 0.34)" : "rgba(20, 28, 42, 0.24)";
+            ctx.strokeText(root.text, cx + 1.4, cy + 2.0);
+            ctx.restore();
+
+            // 3. Translucent frosted glass core
             const gFill = ctx.createLinearGradient(0, cy - halfSpan, 0, cy + halfSpan);
             if (root.isDark) {
-                gFill.addColorStop(0.0, "rgba(255, 255, 255, 0.44)");
-                gFill.addColorStop(0.45, "rgba(255, 255, 255, 0.16)");
-                gFill.addColorStop(0.85, "rgba(255, 255, 255, 0.24)");
-                gFill.addColorStop(1.0, "rgba(255, 255, 255, 0.36)");
+                gFill.addColorStop(0.0, "rgba(255, 255, 255, 0.60)");
+                gFill.addColorStop(0.45, "rgba(255, 255, 255, 0.24)");
+                gFill.addColorStop(0.82, "rgba(255, 255, 255, 0.32)");
+                gFill.addColorStop(1.0, "rgba(255, 255, 255, 0.48)");
             } else {
-                gFill.addColorStop(0.0, "rgba(255, 255, 255, 0.68)");
-                gFill.addColorStop(0.48, "rgba(235, 240, 248, 0.28)");
-                gFill.addColorStop(1.0, "rgba(255, 255, 255, 0.52)");
+                gFill.addColorStop(0.0, "rgba(255, 255, 255, 0.72)");
+                gFill.addColorStop(0.45, "rgba(240, 245, 255, 0.34)");
+                gFill.addColorStop(1.0, "rgba(255, 255, 255, 0.56)");
             }
             ctx.fillStyle = gFill;
             ctx.fillText(root.text, cx, cy);
 
-            // 3. Subtle diagonal optical sheen clipped to the glyphs
+            // 4. Inner specular refraction bevel & diagonal gloss clipped inside glyphs
             ctx.save();
             ctx.globalCompositeOperation = "source-atop";
-            const gSheen = ctx.createLinearGradient(cx - root.pixelSize * 0.85, cy - halfSpan,
-                                                    cx + root.pixelSize * 0.85, cy + halfSpan);
-            gSheen.addColorStop(0.0, "rgba(255, 255, 255, 0.22)");
-            gSheen.addColorStop(0.45, "rgba(255, 255, 255, 0.0)");
-            gSheen.addColorStop(1.0, "rgba(255, 255, 255, 0.12)");
+            const gSheen = ctx.createLinearGradient(cx - root.pixelSize * 0.9, cy - halfSpan,
+                                                    cx + root.pixelSize * 0.9, cy + halfSpan);
+            gSheen.addColorStop(0.0, "rgba(255, 255, 255, 0.26)");
+            gSheen.addColorStop(0.42, "rgba(255, 255, 255, 0.0)");
+            gSheen.addColorStop(0.58, "rgba(255, 255, 255, 0.04)");
+            gSheen.addColorStop(1.0, "rgba(255, 255, 255, 0.16)");
             ctx.fillStyle = gSheen;
             ctx.fillRect(0, 0, w, h);
+
+            ctx.lineWidth = Math.max(2.4, root.pixelSize * 0.025);
+            ctx.lineJoin = "round";
+            const gInner = ctx.createLinearGradient(0, cy - halfSpan, 0, cy + halfSpan);
+            gInner.addColorStop(0.0, "rgba(255, 255, 255, 0.85)");
+            gInner.addColorStop(0.45, "rgba(255, 255, 255, 0.14)");
+            gInner.addColorStop(1.0, "rgba(255, 255, 255, 0.42)");
+            ctx.strokeStyle = gInner;
+            ctx.strokeText(root.text, cx, cy + 1.2);
             ctx.restore();
 
-            // 4. Specular glass rim around glyph edges
+            // 5. Crisp outer specular glass rim
             const gRim = ctx.createLinearGradient(0, cy - halfSpan, 0, cy + halfSpan);
             if (root.isDark) {
-                gRim.addColorStop(0.0, "rgba(255, 255, 255, 0.82)");
-                gRim.addColorStop(0.42, "rgba(255, 255, 255, 0.28)");
-                gRim.addColorStop(0.78, "rgba(255, 255, 255, 0.20)");
-                gRim.addColorStop(1.0, "rgba(255, 255, 255, 0.56)");
+                gRim.addColorStop(0.0, "rgba(255, 255, 255, 0.94)");
+                gRim.addColorStop(0.38, "rgba(255, 255, 255, 0.34)");
+                gRim.addColorStop(0.76, "rgba(255, 255, 255, 0.22)");
+                gRim.addColorStop(1.0, "rgba(255, 255, 255, 0.66)");
             } else {
-                gRim.addColorStop(0.0, "rgba(255, 255, 255, 0.92)");
-                gRim.addColorStop(0.45, "rgba(255, 255, 255, 0.42)");
-                gRim.addColorStop(1.0, "rgba(0, 0, 0, 0.18)");
+                gRim.addColorStop(0.0, "rgba(255, 255, 255, 0.96)");
+                gRim.addColorStop(0.42, "rgba(255, 255, 255, 0.48)");
+                gRim.addColorStop(1.0, "rgba(0, 0, 0, 0.22)");
             }
-            ctx.lineWidth = Math.max(1.3, root.pixelSize * 0.014);
+            ctx.lineWidth = Math.max(1.4, root.pixelSize * 0.014);
             ctx.lineJoin = "round";
             ctx.strokeStyle = gRim;
             ctx.strokeText(root.text, cx, cy);

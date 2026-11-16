@@ -8,12 +8,13 @@
     <entry name="timeFormat" type="Int"><default>0</default></entry>
     <entry name="alignment" type="Int"><default>1</default></entry>
     <entry name="glassNumerals" type="Bool"><default>true</default></entry>
+    <entry name="solidColorMode" type="Int"><default>0</default></entry>
     <entry name="showSeconds" type="Bool"><default>false</default></entry>
     <entry name="showDate" type="Bool"><default>true</default></entry>
     <entry name="showWeekday" type="Bool"><default>true</default></entry>
     <entry name="showDayProgress" type="Bool"><default>false</default></entry>
     <entry name="accentSeconds" type="Bool"><default>true</default></entry>
-    <entry name="showCard" type="Bool"><default>true</default></entry>
+    <entry name="showCard" type="Bool"><default>false</default></entry>
     <entry name="cardStyle" type="Int"><default>0</default></entry>
     <entry name="themeMode" type="Int"><default>0</default></entry>
     <entry name="cardOpacity" type="Double"><default>0.26</default></entry>

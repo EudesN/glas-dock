@@ -97,7 +97,10 @@ PlasmoidItem {
                                           + root.now.getMinutes() * 60
                                           + root.now.getSeconds()) / 86400
         readonly property int pad: Math.round(Math.max(Kirigami.Units.largeSpacing, Math.min(width, height) * 0.08))
-        readonly property color dropTint: root.isDark ? Qt.rgba(0, 0, 0, 0.45) : Qt.rgba(1, 1, 1, 0.55)
+        readonly property color dropTint: root.isDark ? Qt.rgba(0, 0, 0, 0.55) : Qt.rgba(1, 1, 1, 0.65)
+        readonly property color solidNumeralColor: root.cfg.solidColorMode === 1 ? "#ffffff"
+                                                 : root.cfg.solidColorMode === 2 ? root.accent
+                                                 : Kirigami.Theme.textColor
 
         implicitWidth: Kirigami.Units.gridUnit * (mode === 2 ? 14 : mode === 1 ? 15 : 17)
         implicitHeight: Kirigami.Units.gridUnit * (mode === 2 ? 14 : mode === 1 ? 13 : 9.5)
@@ -124,15 +127,15 @@ PlasmoidItem {
             anchors.margins: desk.pad
 
             readonly property real baseDigitPx: desk.mode === 1
-                ? Math.max(24, Math.min(width * 0.48, height * (root.cfg.showDate ? 0.34 : 0.40)))
-                : Math.max(28, Math.min(width / (root.cfg.showSeconds ? 4.3 : 3.0),
-                                        height * (root.cfg.showDate ? 0.62 : 0.78)))
+                ? Math.max(26, Math.min(width * 0.44, height * (root.cfg.showDate ? 0.35 : 0.43)))
+                : Math.max(28, Math.min(width / (root.cfg.showSeconds ? 4.3 : 3.1),
+                                        height * (root.cfg.showDate ? 0.58 : 0.76)))
 
-            // ---- Mode 0: Digital (accent weekday + bold date above giant numeral)
+            // ---- Mode 0: Digital (accent weekday + bold date above 3D glass/solid numeral)
             ColumnLayout {
                 visible: desk.mode === 0
                 anchors.fill: parent
-                spacing: Math.max(0, Math.round(inner.baseDigitPx * 0.04))
+                spacing: Math.max(0, Math.round(inner.baseDigitPx * 0.02))
 
                 Item { Layout.fillHeight: true }
 
@@ -156,7 +159,7 @@ PlasmoidItem {
                         font.pixelSize: Math.max(12, Math.round(inner.baseDigitPx * 0.24))
                         font.weight: Font.DemiBold
                         font.letterSpacing: 0.4
-                        opacity: 0.88
+                        opacity: 0.90
                         elide: Text.ElideRight
                         style: root.cfg.showCard ? Text.Normal : Text.Raised
                         styleColor: desk.dropTint
@@ -168,11 +171,14 @@ PlasmoidItem {
                     spacing: Math.max(4, Math.round(inner.baseDigitPx * 0.08))
 
                     GlassNumeral {
+                        Layout.preferredWidth: implicitWidth
+                        Layout.preferredHeight: implicitHeight
                         text: root.formattedHm(root.now)
                         pixelSize: Math.round(inner.baseDigitPx)
                         fontWeight: Font.Bold
                         isDark: root.isDark
                         glassEffect: root.cfg.glassNumerals
+                        solidColor: desk.solidNumeralColor
                         dropShadow: true
                         shadowColor: desk.dropTint
                     }
@@ -185,9 +191,10 @@ PlasmoidItem {
                         PC3.Label {
                             visible: root.formattedAmPm(root.now).length > 0
                             text: root.formattedAmPm(root.now)
+                            color: desk.solidNumeralColor
                             font.pixelSize: Math.max(10, Math.round(inner.baseDigitPx * 0.20))
                             font.weight: Font.DemiBold
-                            opacity: 0.72
+                            opacity: 0.78
                             style: root.cfg.showCard ? Text.Normal : Text.Raised
                             styleColor: desk.dropTint
                         }
@@ -197,8 +204,8 @@ PlasmoidItem {
                             font.pixelSize: Math.max(12, Math.round(inner.baseDigitPx * 0.32))
                             font.weight: Font.Medium
                             font.features: { "tnum": 1 }
-                            color: root.cfg.accentSeconds ? root.accent : Kirigami.Theme.textColor
-                            opacity: root.cfg.accentSeconds ? 0.95 : 0.65
+                            color: root.cfg.accentSeconds ? root.accent : desk.solidNumeralColor
+                            opacity: root.cfg.accentSeconds ? 0.95 : 0.72
                             style: root.cfg.showCard ? Text.Normal : Text.Raised
                             styleColor: desk.dropTint
                         }
@@ -212,31 +219,37 @@ PlasmoidItem {
             ColumnLayout {
                 visible: desk.mode === 1
                 anchors.fill: parent
-                spacing: 0
+                spacing: -Math.round(inner.baseDigitPx * 0.10)
 
                 Item { Layout.fillHeight: true }
 
                 GlassNumeral {
                     Layout.alignment: desk.hAlign
+                    Layout.preferredWidth: implicitWidth
+                    Layout.preferredHeight: implicitHeight
                     text: root.formattedHours(root.now)
                     pixelSize: Math.round(inner.baseDigitPx)
                     fontWeight: Font.Bold
                     isDark: root.isDark
                     glassEffect: root.cfg.glassNumerals
+                    solidColor: desk.solidNumeralColor
                     dropShadow: true
                     shadowColor: desk.dropTint
                 }
 
                 RowLayout {
                     Layout.alignment: desk.hAlign
-                    spacing: Math.max(4, Math.round(inner.baseDigitPx * 0.12))
+                    spacing: Math.max(4, Math.round(inner.baseDigitPx * 0.08))
 
                     GlassNumeral {
+                        Layout.preferredWidth: implicitWidth
+                        Layout.preferredHeight: implicitHeight
                         text: root.formattedMinutes(root.now)
                         pixelSize: Math.round(inner.baseDigitPx)
                         fontWeight: Font.DemiBold
                         isDark: root.isDark
                         glassEffect: root.cfg.glassNumerals
+                        solidColor: desk.solidNumeralColor
                         dropShadow: true
                         shadowColor: desk.dropTint
                     }
@@ -248,9 +261,10 @@ PlasmoidItem {
                         PC3.Label {
                             visible: root.formattedAmPm(root.now).length > 0
                             text: root.formattedAmPm(root.now)
+                            color: desk.solidNumeralColor
                             font.pixelSize: Math.max(10, Math.round(inner.baseDigitPx * 0.22))
                             font.weight: Font.DemiBold
-                            opacity: 0.68
+                            opacity: 0.76
                             style: root.cfg.showCard ? Text.Normal : Text.Raised
                             styleColor: desk.dropTint
                         }
@@ -260,8 +274,8 @@ PlasmoidItem {
                             font.pixelSize: Math.max(12, Math.round(inner.baseDigitPx * 0.28))
                             font.weight: Font.DemiBold
                             font.features: { "tnum": 1 }
-                            color: root.cfg.accentSeconds ? root.accent : Kirigami.Theme.textColor
-                            opacity: root.cfg.accentSeconds ? 0.95 : 0.6
+                            color: root.cfg.accentSeconds ? root.accent : desk.solidNumeralColor
+                            opacity: root.cfg.accentSeconds ? 0.95 : 0.72
                             style: root.cfg.showCard ? Text.Normal : Text.Raised
                             styleColor: desk.dropTint
                         }
@@ -270,12 +284,13 @@ PlasmoidItem {
 
                 PC3.Label {
                     visible: root.cfg.showDate
-                    Layout.fillWidth: true
+                    Layout.alignment: desk.hAlign
                     Layout.topMargin: Math.max(4, Math.round(inner.baseDigitPx * 0.14))
                     horizontalAlignment: desk.textAlign
                     text: root.formattedDate(root.now)
                     font.pixelSize: Math.max(11, Math.round(inner.baseDigitPx * 0.22))
-                    opacity: 0.72
+                    font.weight: Font.DemiBold
+                    opacity: 0.85
                     elide: Text.ElideRight
                     style: root.cfg.showCard ? Text.Normal : Text.Raised
                     styleColor: desk.dropTint
