@@ -13,7 +13,6 @@ Item {
     id: cell
 
     property var device: null
-    readonly property bool isEmpty: !device || device.empty === true
     property real ringSize: 68
     property bool showDeviceName: false
     property bool showPercentSymbol: false
@@ -21,14 +20,14 @@ Item {
     property bool isDark: true
     property color accent: Kirigami.Theme.highlightColor
 
-    readonly property int targetPercent: (!isEmpty && device.percent !== undefined)
+    readonly property int targetPercent: (device && device.percent !== undefined)
         ? Math.max(0, Math.min(100, device.percent)) : 0
     property real animatedPercent: targetPercent
     Behavior on animatedPercent {
         NumberAnimation { duration: 420; easing.type: Easing.OutCubic }
     }
 
-    readonly property bool charging: !isEmpty && device.charging === true
+    readonly property bool charging: device && device.charging === true
     readonly property color ringColor: {
         if (useAccentColor)
             return accent;
@@ -49,10 +48,10 @@ Item {
     // At 50%, sweep is 125°, ending at exactly 270° (12 o'clock), matching reference.
     readonly property real startAngle: 145
     readonly property real totalSweep: 250
-    readonly property real sweepAngle: isEmpty ? 0 : Math.max(0.001, (animatedPercent / 100) * totalSweep)
+    readonly property real sweepAngle: Math.max(0.001, (animatedPercent / 100) * totalSweep)
 
-    implicitWidth: Math.max(ringSize, col.implicitWidth)
-    implicitHeight: col.implicitHeight
+    width: ringSize
+    height: ringSize + (showDeviceName && device && device.name ? 18 : 0)
 
     opacity: 0
     scale: 0.92
@@ -65,8 +64,8 @@ Item {
 
     ColumnLayout {
         id: col
-        anchors.centerIn: parent
-        spacing: Math.max(2, Math.round(cell.ringSize * 0.06))
+        anchors.fill: parent
+        spacing: 2
 
         Item {
             Layout.alignment: Qt.AlignHCenter
@@ -76,7 +75,7 @@ Item {
             Rectangle {
                 anchors.fill: parent
                 radius: width / 2
-                color: hoverArea.containsMouse && !cell.isEmpty
+                color: hoverArea.containsMouse
                     ? (cell.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.05))
                     : "transparent"
                 Behavior on color { ColorAnimation { duration: 120 } }
@@ -104,8 +103,8 @@ Item {
 
                 // Active battery progress arc
                 ShapePath {
-                    strokeWidth: (!cell.isEmpty && cell.animatedPercent > 0) ? cell.strokePx : 0
-                    strokeColor: (!cell.isEmpty && cell.animatedPercent > 0) ? cell.ringColor : "transparent"
+                    strokeWidth: cell.animatedPercent > 0 ? cell.strokePx : 0
+                    strokeColor: cell.animatedPercent > 0 ? cell.ringColor : "transparent"
                     fillColor: "transparent"
                     capStyle: ShapePath.RoundCap
                     PathAngleArc {
@@ -121,7 +120,7 @@ Item {
 
             // Device icon centered in the upper bowl of the arc
             Kirigami.Icon {
-                visible: !cell.isEmpty && cell.device && cell.device.iconSource
+                visible: cell.device && cell.device.iconSource
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: Math.round(cell.ringSize * 0.44 - height * 0.5 - cell.ringSize * 0.05)
                 width: Math.round(cell.ringSize * 0.35)
@@ -134,7 +133,6 @@ Item {
 
             // Charge bolt and percentage in the bottom opening between the tips
             RowLayout {
-                visible: !cell.isEmpty
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: Math.round(cell.ringSize * 0.44 + cell.radiusPx * 0.52)
                 spacing: 2
@@ -160,10 +158,10 @@ Item {
         }
 
         PC3.Label {
-            visible: !cell.isEmpty && cell.showDeviceName
+            visible: cell.showDeviceName && cell.device && cell.device.name
             Layout.alignment: Qt.AlignHCenter
             Layout.maximumWidth: cell.ringSize + 18
-            text: (!cell.isEmpty && cell.device && cell.device.name) ? cell.device.name : ""
+            text: (cell.device && cell.device.name) ? cell.device.name : ""
             color: cell.fgColor
             font: Kirigami.Theme.smallFont
             opacity: 0.72
@@ -174,10 +172,9 @@ Item {
     PlasmaCore.ToolTipArea {
         id: hoverArea
         anchors.fill: parent
-        enabled: !cell.isEmpty
-        mainText: (!cell.isEmpty && cell.device && cell.device.name) ? cell.device.name : ""
+        mainText: (cell.device && cell.device.name) ? cell.device.name : ""
         subText: {
-            if (!cell.device || cell.isEmpty)
+            if (!cell.device)
                 return "";
             let text = cell.targetPercent + "%" + (cell.charging ? " · Charging" : "");
             const ms = cell.device.remainingMsec || 0;

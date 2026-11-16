@@ -42,29 +42,22 @@ PlasmoidItem {
 
         Shared.ThemeScope { target: view; themeMode: root.cfg.themeMode }
 
-        readonly property var desktopDeviceList: {
-            const list = batSource.devices.slice();
-            if (list.length === 1 && root.cfg.showPlaceholder)
-                list.push({ empty: true });
-            return list;
-        }
-
-        readonly property real padH: Math.round(Kirigami.Units.gridUnit * 1.3)
-        readonly property real padV: Math.round(Kirigami.Units.gridUnit * 0.75)
-        readonly property real cellGap: Math.round(Kirigami.Units.gridUnit * 1.1)
-        readonly property int visibleCount: Math.max(1, desktopDeviceList.length)
+        readonly property real padH: Math.round(Kirigami.Units.gridUnit * 1.2)
+        readonly property real padV: Math.round(Kirigami.Units.gridUnit * 0.8)
+        readonly property real cellGap: Math.round(Kirigami.Units.gridUnit * 1.0)
+        readonly property int visibleCount: Math.max(1, batSource.count)
         readonly property real cardIdealW: visibleCount * root.cfg.ringSize
             + Math.max(0, visibleCount - 1) * cellGap + padH * 2
-        readonly property real cardIdealH: (root.cfg.ringSize + (root.cfg.showDeviceNames ? 18 : 0)) + padV * 2
+        readonly property real cardIdealH: root.cfg.ringSize + (root.cfg.showDeviceNames ? 18 : 0) + padV * 2
 
         implicitWidth: root.inPanel
             ? Math.ceil(panelRow.implicitWidth) + Math.round(height * 0.24) * 2
-            : Math.max(160, cardIdealW)
-        implicitHeight: root.inPanel ? 32 : Math.max(88, Math.max(cardIdealH, desktopFlow.implicitHeight + padV * 2))
+            : cardIdealW
+        implicitHeight: root.inPanel ? 32 : cardIdealH
 
         Layout.preferredWidth: implicitWidth
-        Layout.minimumWidth: root.inPanel ? implicitWidth : 130
-        Layout.minimumHeight: root.inPanel ? 0 : 80
+        Layout.minimumWidth: root.inPanel ? implicitWidth : (root.cfg.ringSize + padH * 2)
+        Layout.minimumHeight: root.inPanel ? 0 : (root.cfg.ringSize + padV * 2)
         Layout.fillHeight: root.inPanel
 
         // ============================================================ DESKTOP
@@ -77,7 +70,7 @@ PlasmoidItem {
                 visible: root.cfg.showCard
                 style: root.cfg.cardStyle
                 backgroundOpacity: root.cfg.cardOpacity
-                radius: Math.min(height / 2, Math.max(root.cfg.cardRadius, height / 2))
+                radius: Math.min(height, width) / 2
                 isDark: root.isDark
                 accent: root.accent
                 showBorder: root.cfg.showBorder
@@ -86,14 +79,13 @@ PlasmoidItem {
                 frost: root.cfg.blurFrost
             }
 
-            Flow {
-                id: desktopFlow
+            Row {
+                id: desktopRow
                 anchors.centerIn: parent
-                width: Math.min(implicitWidth, Math.max(1, parent.width - view.padH * 2))
                 spacing: view.cellGap
 
                 Repeater {
-                    model: view.desktopDeviceList
+                    model: batSource.devices
                     delegate: BatteryRing {
                         required property var modelData
                         device: modelData
@@ -181,15 +173,13 @@ PlasmoidItem {
                 frost: root.cfg.blurFrost
                 sourceComponent: Item {
                     readonly property int count: Math.max(1, batSource.count)
-                    readonly property int cols: Math.min(4, count)
-                    implicitWidth: Math.max(140, cols * (root.cfg.ringSize + 10)
-                        + Math.max(0, cols - 1) * view.cellGap)
-                    implicitHeight: Math.max(90, popupFlow.implicitHeight)
+                    implicitWidth: Math.max(120, count * root.cfg.ringSize
+                        + Math.max(0, count - 1) * view.cellGap + view.padH * 2)
+                    implicitHeight: Math.max(70, root.cfg.ringSize + 18 + view.padV * 2)
 
-                    Flow {
-                        id: popupFlow
+                    Row {
+                        id: popupRow
                         anchors.centerIn: parent
-                        width: parent.width
                         spacing: view.cellGap
                         Repeater {
                             model: batSource.devices
