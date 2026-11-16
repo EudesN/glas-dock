@@ -69,6 +69,8 @@ void BlurBehind::setWindow(QQuickWindow *window) {
   m_window = window;
   m_region = QRegion();
   m_lastRect = QRectF();
+  m_lastSnappedRect = QRect();
+  m_lastAppliedRadius = -1;
   updateWindow(oldWindow);
   if (!m_window)
     return;
@@ -106,8 +108,12 @@ void BlurBehind::apply() {
   const QRectF r = mapRectToScene(boundingRect());
   m_lastRect = r;
   if (!m_active || !isVisible() || r.isEmpty()) {
-    m_region = QRegion();
-    updateWindow(m_window);
+    if (!m_region.isEmpty()) {
+      m_region = QRegion();
+      m_lastSnappedRect = QRect();
+      m_lastAppliedRadius = -1;
+      updateWindow(m_window);
+    }
     return;
   }
   // Round inward so KWin's un-antialiased blur region never peeks 1 px outside
@@ -117,21 +123,32 @@ void BlurBehind::apply() {
   const int right = qFloor(r.right() + 0.05);
   const int bottom = qFloor(r.bottom() + 0.05);
   if (right <= left || bottom <= top) {
-    m_region = QRegion();
-    updateWindow(m_window);
+    if (!m_region.isEmpty()) {
+      m_region = QRegion();
+      m_lastSnappedRect = QRect();
+      m_lastAppliedRadius = -1;
+      updateWindow(m_window);
+    }
     return;
   }
-  const QRectF snapped(left, top, right - left, bottom - top);
+  const QRect snappedInt(left, top, right - left, bottom - top);
+  const QRectF snapped(snappedInt);
   const qreal radius =
       qMin(m_radius, qMin(snapped.width(), snapped.height()) / 2.0);
-  if (radius <= 0.5) {
-    m_region = QRegion(snapped.toRect());
-  } else {
-    QPainterPath path;
-    const QRectF inner = snapped.adjusted(0.5, 0.5, -0.5, -0.5);
-    path.addRoundedRect(inner, qMax(0.0, radius - 0.5),
-                        qMax(0.0, radius - 0.5));
-    m_region = QRegion(path.toFillPolygon().toPolygon());
+  if (snappedInt != m_lastSnappedRect ||
+      !qFuzzyCompare(1.0 + radius, 1.0 + m_lastAppliedRadius) ||
+      m_region.isEmpty()) {
+    m_lastSnappedRect = snappedInt;
+    m_lastAppliedRadius = radius;
+    if (radius <= 0.5) {
+      m_region = QRegion(snappedInt);
+    } else {
+      QPainterPath path;
+      const QRectF inner = snapped.adjusted(0.5, 0.5, -0.5, -0.5);
+      path.addRoundedRect(inner, qMax(0.0, radius - 0.5),
+                          qMax(0.0, radius - 0.5));
+      m_region = QRegion(path.toFillPolygon().toPolygon());
+    }
   }
   updateWindow(m_window);
 }

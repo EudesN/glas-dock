@@ -90,8 +90,14 @@ PlasmoidItem {
     }
     Connections {
         target: notifModel
+        enabled: Plasmoid.configuration.showBadges
         function onCountChanged() { recountTimer.restart(); }
-        function onDataChanged() { recountTimer.restart(); }
+        function onDataChanged(topLeft, bottomRight, roles) {
+            if (!roles || roles.length === 0
+                    || roles.indexOf(NotificationManager.Notifications.ReadRole) !== -1
+                    || roles.indexOf(NotificationManager.Notifications.DesktopEntryRole) !== -1)
+                recountTimer.restart();
+        }
         function onModelReset() { recountTimer.restart(); }
     }
     Timer {
@@ -222,17 +228,30 @@ PlasmoidItem {
         // "Add Separator After"). Stored as the launcher URLs of the icons they
         // follow ("@apps" = after the apps button), so they move with the icons.
         readonly property real separatorGap: Math.max(spacing, 6) * 2 + 1
-        property int modelRevision: 0      // bumped when tasks move/change
+        property int modelRevision: 0      // bumped when tasks move/insert/remove
+        property int activeRevision: 0     // bumped when active window or group child count changes
         Connections {
             target: tasksModel
-            function onRowsMoved() { dock.modelRevision++; }
-            function onRowsInserted() { dock.modelRevision++; }
-            function onRowsRemoved() { dock.modelRevision++; }
+            function onRowsMoved() { dock.modelRevision++; dock.activeRevision++; }
+            function onRowsInserted() { dock.modelRevision++; dock.activeRevision++; }
+            function onRowsRemoved() { dock.modelRevision++; dock.activeRevision++; }
             function onModelReset() {
                 dock.modelRevision++;
+                dock.activeRevision++;
                 dock.bouncingCount = 0;
             }
-            function onDataChanged() { dock.modelRevision++; }
+            function onDataChanged(topLeft, bottomRight, roles) {
+                if (!roles || roles.length === 0) {
+                    dock.modelRevision++;
+                    dock.activeRevision++;
+                    return;
+                }
+                if (roles.indexOf(TaskManager.AbstractTasksModel.LauncherUrlWithoutIcon) !== -1)
+                    dock.modelRevision++;
+                if (roles.indexOf(TaskManager.AbstractTasksModel.IsActive) !== -1
+                        || roles.indexOf(TaskManager.AbstractTasksModel.ChildCount) !== -1)
+                    dock.activeRevision++;
+            }
         }
         function launcherKeyOf(row) {
             const url = tasksModel.data(tasksModel.makeModelIndex(row), TaskManager.AbstractTasksModel.LauncherUrlWithoutIcon);
@@ -409,7 +428,9 @@ PlasmoidItem {
             if (task && previewTask !== task)
                 return;
             previewShowTimer.stop();
-            if (windowPreview.visible)
+            if (previewRevealTimer.running)
+                hidePreview();
+            else if (windowPreview.visible)
                 previewHideTimer.restart();
         }
 
@@ -538,6 +559,7 @@ PlasmoidItem {
             const n = slots, b = baseIcon, sp = spacing;
             const R = b * cfg.zoomRange;
             const z = (maxZoom - 1) * zoom;          // 0..maxZoom-1, animated
+            const mx = z > 0 ? mouseX : 0;
             const left0 = (width - restWidth) / 2;
             const center = i => left0 + (restOffsets[i] || 0) + b / 2;
             const g = d => d < R ? (Math.cos(Math.PI * d / R) + 1) / 2 : 0;
@@ -549,7 +571,7 @@ PlasmoidItem {
             // does not shrink and grow again when moving between them.
             const firstZ = zoomable(0) ? 0 : Math.min(1, n - 1);
             const zx = n > 0 && cfg.centeredZoom
-                ? Math.max(center(firstZ), Math.min(center(n - 1), mouseX)) : mouseX;
+                ? Math.max(center(firstZ), Math.min(center(n - 1), mx)) : mx;
 
             // extra width of each icon for the current pointer position
             let extras = [], sumE = 0;
@@ -595,7 +617,8 @@ PlasmoidItem {
             for (let i = 0; i < n; i++) {
                 const s = b + extras[i];
                 const restX = center(i) - b / 2;
-                leftExtra += extras[i] * Math.max(0, Math.min(1, (mouseX - restX) / b));
+                if (extras[i] > 0)
+                    leftExtra += extras[i] * Math.max(0, Math.min(1, (mx - restX) / b));
                 sizes.push(s);
             }
             const iconsTotal = n * b + sumE + sp * Math.max(0, n - 1) + gapsTotal;
@@ -884,6 +907,7 @@ PlasmoidItem {
                 isDark: dock.isDark
                 player: root.activePlayer
                 active: dock.popupOpenFor(playerTile)
+                onHoveredChanged: if (hovered && !widgetPopup.visible) widgetPopupLoader.sourceComponent = playerPopupComponent
                 onClicked: dock.toggleWidgetPopup(playerTile, playerPopupComponent)
             }
             Widgets.WeatherTile {
@@ -1324,7 +1348,6 @@ PlasmoidItem {
                     }
 
                     readonly property int winCount: {
-                        dock.modelRevision;
                         const c = task.model.ChildCount || 0;
                         return c > 1 ? c : 1;
                     }
@@ -1332,10 +1355,10 @@ PlasmoidItem {
 
                     property int activeSlot: 0
                     readonly property int currentChildSlot: {
-                        dock.modelRevision;
                         const n = task.model.ChildCount || 0;
                         if (n <= 1)
                             return 0;
+                        dock.activeRevision;
                         for (let c = 0; c < n; c++) {
                             if (tasksModel.data(task.modelIndex(c), TaskManager.AbstractTasksModel.IsActive))
                                 return c % dotCount;

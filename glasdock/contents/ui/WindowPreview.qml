@@ -216,7 +216,7 @@ PlasmaCore.Dialog {
 
                             TaskManager.ScreencastingRequest {
                                 id: cast
-                                uuid: card.modelData.uuid
+                                uuid: preview.visible ? card.modelData.uuid : ""
                             }
 
                             Kirigami.Icon {

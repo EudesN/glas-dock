@@ -21,6 +21,7 @@ PlasmaCore.Dialog {
     property rect screenGeometry: Qt.rect(0, 0, 0, 0)
     property alias sourceComponent: loader.sourceComponent
     readonly property Item loadedItem: loader.item
+    property bool preload: false
 
     // look
     property int style: 0
@@ -246,7 +247,7 @@ PlasmaCore.Dialog {
                 // stays where it is in the full panel while the glass morphs
                 x: frame.padding + frame.fx - panel.x
                 y: frame.padding + frame.fy - panel.y
-                active: popup.visible
+                active: popup.visible || popup.preload
                 width: item ? item.implicitWidth : 0
                 height: item ? item.implicitHeight : 0
                 focus: true

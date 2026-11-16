@@ -45,7 +45,9 @@ private:
 
     bool m_active = true;
     qreal m_radius = 0;
+    qreal m_lastAppliedRadius = -1;
     QRectF m_lastRect;
+    QRect m_lastSnappedRect;
     QRegion m_region;
     QPointer<QQuickWindow> m_window;
     QTimer m_applyTimer;     // coalesces changes

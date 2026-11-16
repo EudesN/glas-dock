@@ -51,6 +51,7 @@ Item {
         visible: false
         source: playerProxy.artUrl
         sourceSize: Qt.size(256, 256)
+        fillMode: Image.PreserveAspectCrop
         asynchronous: true
         cache: true
     }
@@ -211,10 +212,10 @@ Item {
 
     Connections {
         target: tasksModel
+        enabled: source.rawPlayer !== null
         function onRowsInserted() { taskSyncTimer.restart(); }
         function onRowsRemoved() { taskSyncTimer.restart(); }
         function onModelReset() { taskSyncTimer.restart(); }
-        function onDataChanged() { taskSyncTimer.restart(); }
     }
     Timer {
         id: taskSyncTimer
@@ -295,7 +296,6 @@ Item {
         function onRowsInserted() { pickTimer.restart(); }
         function onRowsRemoved() { pickTimer.restart(); }
         function onModelReset() { pickTimer.restart(); }
-        function onDataChanged() { pickTimer.restart(); }
     }
 
     // coalesce bursts of model changes into one choice

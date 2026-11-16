@@ -20,7 +20,7 @@ PlasmoidItem {
     Shared.MprisSource { id: mpris }
     readonly property var player: mpris.player
     readonly property bool hasPlayer: player !== null && player !== undefined
-    readonly property bool hasMedia: mpris.hasMedia
+    readonly property bool hasMedia: hasPlayer && mpris.hasMedia
     readonly property bool playing: hasMedia && player.playbackStatus === Mpris.PlaybackStatus.Playing
     readonly property bool idle: !hasMedia
     // while the panel is being edited the widget is always shown, so it can be
@@ -167,6 +167,7 @@ PlasmoidItem {
 
         Shared.GlassPopup {
             id: popup
+            preload: hover.hovered
             anchorItem: compact
             edge: Plasmoid.location
             gap: root.cfg.popupGap
