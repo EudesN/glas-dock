@@ -9,6 +9,7 @@ KCM.SimpleKCM {
     property alias cfg_showLaptop: showLaptop.checked
     property alias cfg_showPeripherals: showPeripherals.checked
     property alias cfg_showBluetooth: showBluetooth.checked
+    property alias cfg_hideWhenEmpty: hideWhenEmpty.checked
     property alias cfg_showDeviceNames: showDeviceNames.checked
     property alias cfg_showPercentSymbol: showPercentSymbol.checked
     property alias cfg_useAccentColor: useAccentColor.checked
@@ -40,6 +41,7 @@ KCM.SimpleKCM {
             enabled: showPeripherals.checked
             text: "Bluetooth audio devices (headphones, earbuds)"
         }
+        QQC2.CheckBox { id: hideWhenEmpty; text: "Hide widget when no devices are connected" }
         QQC2.CheckBox { id: showDeviceNames; text: "Device names under percentages" }
         QQC2.CheckBox { id: showPercentSymbol; text: "Show % symbol next to numbers" }
         QQC2.CheckBox { id: useAccentColor; Kirigami.FormData.label: "Ring color:"; text: "Use the system accent color instead of battery green" }

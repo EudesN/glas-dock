@@ -29,6 +29,9 @@ PlasmoidItem {
     Shared.ThemeScope { id: themeScope; target: null; themeMode: root.cfg.themeMode }
     readonly property bool isDark: themeScope.isDark
     readonly property color accent: themeScope.accent
+    readonly property bool editing: Plasmoid.containment && Plasmoid.containment.corona
+                                    ? Plasmoid.containment.corona.editMode === true : false
+    readonly property bool hidden: !batSource.hasDevices && root.cfg.hideWhenEmpty && !editing
 
     function formatRemaining(ms) {
         if (!ms || ms <= 60000)
@@ -52,6 +55,7 @@ PlasmoidItem {
 
     preferredRepresentation: fullRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
+    Plasmoid.status: hidden ? PlasmaCore.Types.PassiveStatus : PlasmaCore.Types.ActiveStatus
     toolTipMainText: {
         if (!batSource.hasDevices)
             return "No battery devices";
@@ -103,7 +107,7 @@ PlasmoidItem {
         readonly property int panelOverflow: Math.max(0, batSource.count - panelDevices.length)
 
         implicitWidth: root.inPanel
-            ? Math.ceil(panelRow.implicitWidth) + panelPad * (root.cfg.pillBackground ? 4 : 2) + 4
+            ? (root.hidden ? 0 : Math.ceil(panelRow.implicitWidth) + panelPad * (root.cfg.pillBackground ? 4 : 2) + 4)
             : cardIdealW
         implicitHeight: root.inPanel ? 32 : cardIdealH
 
@@ -115,7 +119,7 @@ PlasmoidItem {
 
         // ============================================================ DESKTOP
         Item {
-            visible: !root.inPanel
+            visible: !root.inPanel && !root.hidden
             anchors.fill: parent
 
             Shared.GlassSurface {
@@ -162,8 +166,16 @@ PlasmoidItem {
 
         // =================================================== STATUS BAR / PANEL
         Item {
-            visible: root.inPanel
+            visible: root.inPanel && !root.hidden
             anchors.fill: parent
+
+            Connections {
+                target: root
+                function onHiddenChanged() {
+                    if (root.hidden && popup.visible)
+                        popup.close();
+                }
+            }
 
             // Glass pill matching Glasclock / Glasweather / Glasplayer
             Rectangle {
