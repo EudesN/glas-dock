@@ -9,7 +9,7 @@ Item {
     id: data
 
     property string city: ""
-    // Glasdock's own badge icons (shared/images/weather) instead of the
+    // GlasDo's built-in weather icons (shared/images/weather) instead of the
     // icon theme's weather icons
     property bool useBadges: true
     property bool fahrenheit: false
@@ -123,7 +123,7 @@ Item {
     // icon for a WMO code: a badge image, or a Breeze icon name
     function iconFor(code, isDay) {
         if (useBadges)
-            return Qt.resolvedUrl("images/weather/" + badgeKind(code) + (isDay === false ? "-night" : "-day") + ".svg");
+            return Qt.resolvedUrl("images/weather/" + badgeKind(code) + (isDay === false ? "-night" : "-day") + ".png");
         return themeIconFor(code, isDay);
     }
 

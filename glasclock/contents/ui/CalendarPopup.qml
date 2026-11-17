@@ -113,58 +113,95 @@ Item {
         // ------------------------------------------------------------ header
         RowLayout {
             Layout.fillWidth: true
-            spacing: Kirigami.Units.smallSpacing
-            PC3.Label {
-                text: popup.now.toLocaleDateString(Qt.locale(), "ddd").toUpperCase()
-                color: popup.accent
-                font.weight: Font.Bold
-            }
-            PC3.Label {
-                text: popup.now.getDate()
-                font.weight: Font.Bold
-            }
-            PC3.Label {
-                text: "W" + popup.weekOf(popup.now)
-                color: Qt.rgba(popup.accent.r, popup.accent.g, popup.accent.b, 0.55)
-                font.weight: Font.Bold
-            }
-            PC3.Label {
-                Layout.leftMargin: Kirigami.Units.largeSpacing
-                text: popup.timeText(popup.now)
-                font.features: { "tnum": 1 }
-                opacity: 0.6
-            }
-            Item { Layout.fillWidth: true }
-            Shared.GlassButton {
-                visible: calendar.month !== popup.now.getMonth() + 1 || calendar.year !== popup.now.getFullYear()
-                text: "Today"
-                iconSize: Kirigami.Units.iconSizes.small
-                isDark: popup.isDark
-                accent: popup.accent
-                onClicked: {
-                    calendar.resetToToday();
-                    popup.selected = new Date(popup.now.getFullYear(), popup.now.getMonth(), popup.now.getDate());
+            spacing: Kirigami.Units.largeSpacing
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 2
+
+                PC3.Label {
+                    Layout.fillWidth: true
+                    text: popup.now.toLocaleDateString(Qt.locale(), Locale.LongFormat)
+                    color: popup.accent
+                    font.pixelSize: Math.round(Kirigami.Theme.defaultFont.pixelSize * 1.12)
+                    font.weight: Font.Bold
+                    elide: Text.ElideRight
+                }
+
+                RowLayout {
+                    spacing: Kirigami.Units.smallSpacing
+
+                    Rectangle {
+                        implicitWidth: weekLbl.implicitWidth + Kirigami.Units.smallSpacing * 2
+                        implicitHeight: weekLbl.implicitHeight + 2
+                        radius: height / 2
+                        color: Qt.rgba(popup.accent.r, popup.accent.g, popup.accent.b, popup.isDark ? 0.16 : 0.14)
+                        PC3.Label {
+                            id: weekLbl
+                            anchors.centerIn: parent
+                            text: "Week " + popup.weekOf(popup.now)
+                            color: popup.accent
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
+                    PC3.Label {
+                        text: "·"
+                        opacity: 0.45
+                        font: Kirigami.Theme.smallFont
+                    }
+
+                    PC3.Label {
+                        text: popup.timeText(popup.now)
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        font.features: { "tnum": 1 }
+                        opacity: 0.72
+                    }
                 }
             }
-            Shared.GlassButton {
-                iconName: "go-previous"
-                iconSize: Kirigami.Units.iconSizes.small
-                isDark: popup.isDark
-                onClicked: calendar.previousMonth()
+
+            RowLayout {
+                Layout.alignment: Qt.AlignVCenter
+                spacing: Kirigami.Units.smallSpacing
+
+                Shared.GlassButton {
+                    visible: calendar.month !== popup.now.getMonth() + 1 || calendar.year !== popup.now.getFullYear()
+                    text: "Today"
+                    iconSize: Kirigami.Units.iconSizes.small
+                    isDark: popup.isDark
+                    accent: popup.accent
+                    onClicked: {
+                        calendar.resetToToday();
+                        popup.selected = new Date(popup.now.getFullYear(), popup.now.getMonth(), popup.now.getDate());
+                    }
+                }
+                Shared.GlassButton {
+                    iconName: "go-previous"
+                    iconSize: Kirigami.Units.iconSizes.small
+                    isDark: popup.isDark
+                    onClicked: calendar.previousMonth()
+                }
+                PC3.Label {
+                    id: monthLabel
+                    text: (calendar.monthName + (calendar.year !== popup.now.getFullYear() ? " " + calendar.year : "")).toUpperCase()
+                    color: popup.accent
+                    font.weight: Font.Bold
+                    transform: Translate { id: monthLabelSlide }
+                }
+                Shared.GlassButton {
+                    iconName: "go-next"
+                    iconSize: Kirigami.Units.iconSizes.small
+                    isDark: popup.isDark
+                    onClicked: calendar.nextMonth()
+                }
             }
-            PC3.Label {
-                id: monthLabel
-                text: (calendar.monthName + (calendar.year !== popup.now.getFullYear() ? " " + calendar.year : "")).toUpperCase()
-                color: popup.accent
-                font.weight: Font.Bold
-                transform: Translate { id: monthLabelSlide }
-            }
-            Shared.GlassButton {
-                iconName: "go-next"
-                iconSize: Kirigami.Units.iconSizes.small
-                isDark: popup.isDark
-                onClicked: calendar.nextMonth()
-            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            height: 1
+            color: popup.isDark ? Qt.rgba(1, 1, 1, 0.09) : Qt.rgba(0, 0, 0, 0.08)
         }
 
         RowLayout {
@@ -328,9 +365,9 @@ Item {
                                 opacity: day.inMonth ? 1 : 0.32
                                 font.weight: day.isToday ? Font.Bold : Font.Normal
                             }
-                            // has events
+                            // has events (hidden while selected or today so it never overlaps the circle)
                             Rectangle {
-                                visible: (day.model.eventCount || 0) > 0
+                                readonly property bool showDot: (day.model.eventCount || 0) > 0 && !day.isSelected && !day.isToday
                                 width: 4
                                 height: 4
                                 radius: 2
@@ -338,7 +375,11 @@ Item {
                                 anchors.bottom: parent.bottom
                                 anchors.bottomMargin: 1
                                 color: popup.accent
-                                opacity: day.inMonth ? 1 : 0.4
+                                opacity: showDot ? (day.inMonth ? 1 : 0.4) : 0
+                                scale: showDot ? 1 : 0.4
+                                visible: opacity > 0
+                                Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                                Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                             }
                             MouseArea {
                                 id: dayArea
