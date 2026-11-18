@@ -1,12 +1,14 @@
 #include "blurbehind.h"
 
 #include <KWindowEffects>
+#include <QHash>
 #include <QList>
 #include <QPainterPath>
 #include <QtMath>
 #include <utility>
 
 static QList<BlurBehind *> s_instances;
+static QHash<QQuickWindow *, QRegion> s_windowRegions;
 
 BlurBehind::BlurBehind(QQuickItem *parent) : QQuickItem(parent) {
   s_instances.append(this);
@@ -20,7 +22,10 @@ BlurBehind::BlurBehind(QQuickItem *parent) : QQuickItem(parent) {
   // or its theme changes; re-apply ours shortly after such events.
   m_refreshTimer.setSingleShot(true);
   m_refreshTimer.setInterval(250);
-  connect(&m_refreshTimer, &QTimer::timeout, this, &BlurBehind::apply);
+  connect(&m_refreshTimer, &QTimer::timeout, this, [this] {
+    apply();
+    updateWindow(m_window, true);
+  });
 
   connect(this, &QQuickItem::visibleChanged, this, &BlurBehind::scheduleApply);
 }
@@ -35,7 +40,10 @@ void BlurBehind::setActive(bool active) {
     return;
   m_active = active;
   Q_EMIT activeChanged();
-  scheduleApply();
+  if (!m_active)
+    apply();
+  else
+    scheduleApply();
 }
 
 void BlurBehind::setRadius(qreal radius) {
@@ -149,11 +157,11 @@ void BlurBehind::apply() {
                           qMax(0.0, radius - 0.5));
       m_region = QRegion(path.toFillPolygon().toPolygon());
     }
+    updateWindow(m_window);
   }
-  updateWindow(m_window);
 }
 
-void BlurBehind::updateWindow(QQuickWindow *window) {
+void BlurBehind::updateWindow(QQuickWindow *window, bool force) {
   if (!window)
     return;
   QRegion total;
@@ -162,6 +170,13 @@ void BlurBehind::updateWindow(QQuickWindow *window) {
         !item->m_region.isEmpty())
       total += item->m_region;
   }
+  if (!s_windowRegions.contains(window)) {
+    QObject::connect(window, &QObject::destroyed, window,
+                     [window] { s_windowRegions.remove(window); });
+  } else if (!force && s_windowRegions.value(window) == total) {
+    return;
+  }
+  s_windowRegions.insert(window, total);
   if (total.isEmpty())
     KWindowEffects::enableBlurBehind(window, false);
   else

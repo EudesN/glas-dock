@@ -10,6 +10,8 @@ Tile {
     id: tile
 
     property date now: new Date()
+    accessibleName: Qt.formatTime(tile.now, Qt.locale().timeFormat(Locale.ShortFormat))
+                    + ", " + tile.now.toLocaleDateString(Qt.locale(), i18n("ddd, d MMM"))
 
     ColumnLayout {
         anchors.centerIn: parent
@@ -23,7 +25,7 @@ Tile {
         }
         PC3.Label {
             Layout.alignment: Qt.AlignHCenter
-            text: tile.now.toLocaleDateString(Qt.locale(), "ddd, d MMM")
+            text: tile.now.toLocaleDateString(Qt.locale(), i18n("ddd, d MMM"))
             font: Kirigami.Theme.smallFont
             opacity: 0.6
         }

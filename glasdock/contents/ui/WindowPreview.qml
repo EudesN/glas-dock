@@ -39,8 +39,10 @@ PlasmaCore.Dialog {
     property bool blurBehind: false
     property real frost: 0
 
-    signal activateRequested(int row, int child)
-    signal closeRequested(int row, int child)
+    // the window is identified by its uuid, not by its row: rows change when
+    // other apps open or close while the previews are shown
+    signal activateRequested(string uuid)
+    signal closeRequested(string uuid)
 
     type: PlasmaCore.Dialog.Tooltip
     flags: Qt.WindowDoesNotAcceptFocus | Qt.WindowStaysOnTopHint
@@ -63,7 +65,10 @@ PlasmaCore.Dialog {
             nx = Math.max(g.x + margin - m, Math.min(g.x + g.width - margin + m - w, nx));
         }
         x = nx;
-        y = Math.round(anchorTop - gap - h + frame.bottomShadowMargin);
+        let ny = Math.round(anchorTop - gap - h + frame.bottomShadowMargin);
+        if (g.width > 0)
+            ny = Math.max(g.y - frame.shadowMargin, ny);   // never above the screen
+        y = ny;
     }
 
     mainItem: Item {
@@ -72,13 +77,28 @@ PlasmaCore.Dialog {
         readonly property int shadowMargin: 28
         readonly property int bottomShadowMargin: gap
         readonly property int padding: Kirigami.Units.largeSpacing
-        readonly property int columns: Math.min(Math.max(1, preview.windows.length), 4)
-        readonly property int rows: Math.max(1, Math.ceil(preview.windows.length / columns))
+        readonly property int count: Math.max(1, preview.windows.length)
+        // up to 4 per row; more columns for many windows so it stays wide, not tall
+        readonly property int columns: count <= 4 ? count : Math.min(8, Math.ceil(Math.sqrt(count * 1.6)))
+        readonly property int rows: Math.max(1, Math.ceil(count / columns))
+        // thumbnails shrink so the whole panel fits on screen (90% wide, 60% tall)
+        readonly property real fit: {
+            const g = preview.screenGeometry;
+            if (g.width <= 0)
+                return 1;
+            const sp = Kirigami.Units.smallSpacing;
+            const extraW = sp * 2 + (columns - 1) * sp / columns;
+            const extraH = Kirigami.Units.iconSizes.small + sp * 4;
+            const byW = (g.width * 0.9 / columns - extraW) / preview.thumbWidth;
+            const byH = (g.height * 0.6 / rows - extraH) / (preview.thumbWidth * 0.62);
+            return Math.max(0.4, Math.min(1, byW, byH));
+        }
+        readonly property int thumb: Math.round(preview.thumbWidth * fit)
         // card size computed directly (the Grid only lays out once the window
         // is shown, and the window must have its final size before that)
-        readonly property real cardWidth: preview.thumbWidth + Kirigami.Units.smallSpacing * 2
+        readonly property real cardWidth: thumb + Kirigami.Units.smallSpacing * 2
         readonly property real cardHeight: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
-                                         + Math.round(preview.thumbWidth * 0.62) + Kirigami.Units.smallSpacing * 3
+                                         + Math.round(thumb * 0.62) + Kirigami.Units.smallSpacing * 3
         readonly property real cardsWidth: columns * cardWidth + (columns - 1) * Kirigami.Units.smallSpacing
         readonly property real cardsHeight: rows * cardHeight + (rows - 1) * Kirigami.Units.smallSpacing
 
@@ -134,7 +154,7 @@ PlasmaCore.Dialog {
                     delegate: Rectangle {
                         id: card
                         required property var modelData
-                        readonly property real thumbHeight: Math.round(preview.thumbWidth * 0.62)
+                        readonly property real thumbHeight: Math.round(frame.thumb * 0.62)
 
                         width: frame.cardWidth
                         height: frame.cardHeight
@@ -155,9 +175,9 @@ PlasmaCore.Dialog {
                             acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                             onClicked: mouse => {
                                 if (mouse.button === Qt.MiddleButton)
-                                    preview.closeRequested(card.modelData.row, card.modelData.child);
+                                    preview.closeRequested(card.modelData.uuid);
                                 else
-                                    preview.activateRequested(card.modelData.row, card.modelData.child);
+                                    preview.activateRequested(card.modelData.uuid);
                             }
                         }
 
@@ -201,7 +221,7 @@ PlasmaCore.Dialog {
                                     id: closeArea
                                     anchors.fill: parent
                                     hoverEnabled: true
-                                    onClicked: preview.closeRequested(card.modelData.row, card.modelData.child)
+                                    onClicked: preview.closeRequested(card.modelData.uuid)
                                 }
                             }
                         }
@@ -211,7 +231,7 @@ PlasmaCore.Dialog {
                             id: thumb
                             x: Kirigami.Units.smallSpacing
                             y: header.y + header.height + Kirigami.Units.smallSpacing
-                            width: preview.thumbWidth
+                            width: frame.thumb
                             height: card.thumbHeight
 
                             TaskManager.ScreencastingRequest {

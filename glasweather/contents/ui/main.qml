@@ -30,28 +30,39 @@ PlasmoidItem {
 
     preferredRepresentation: fullRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
-    toolTipMainText: ready ? weatherSource.current.temp + "° · " + weatherSource.describe(weatherSource.current.code) : "Weather"
-    toolTipSubText: ready ? weatherSource.place : (weatherSource.error || "Loading…")
+    toolTipMainText: ready ? weatherSource.current.temp + "° · " + weatherSource.describe(weatherSource.current.code) : i18n("Weather")
+    toolTipSubText: ready ? weatherSource.place : (weatherSource.error || i18n("Loading…"))
 
     fullRepresentation: Item {
         id: compact
 
         Shared.ThemeScope { target: compact; themeMode: root.cfg.themeMode }
-        readonly property real pad: Math.round(height * 0.12)
+        readonly property bool vertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
+        readonly property real refSize: vertical ? width : height
+        readonly property real pad: Math.round(refSize * 0.12)
 
-        Layout.preferredWidth: row.implicitWidth + pad * (root.cfg.pillBackground ? 4 : 2)
-        Layout.minimumWidth: Layout.preferredWidth
-        Layout.fillHeight: true
+        activeFocusOnTab: true
+        Accessible.role: Accessible.Button
+        Accessible.name: root.toolTipMainText + (root.toolTipSubText ? ", " + root.toolTipSubText : "")
+        Keys.onReturnPressed: popup.toggle()
+        Keys.onSpacePressed: popup.toggle()
+
+        Layout.preferredWidth: vertical ? -1 : row.implicitWidth + pad * (root.cfg.pillBackground ? 4 : 2)
+        Layout.minimumWidth: vertical ? 0 : Layout.preferredWidth
+        Layout.preferredHeight: vertical ? row.implicitHeight + pad * 2 : -1
+        Layout.minimumHeight: vertical ? Layout.preferredHeight : 0
+        Layout.fillWidth: vertical
+        Layout.fillHeight: !vertical
 
         Rectangle {
             visible: root.cfg.pillBackground
             anchors.fill: parent
             anchors.topMargin: compact.pad / 2
             anchors.bottomMargin: compact.pad / 2
-            radius: height / 2
+            radius: Math.min(width, height) / 2
             color: root.isDark ? Qt.rgba(1, 1, 1, area.containsMouse ? 0.14 : 0.08)
                                : Qt.rgba(1, 1, 1, area.containsMouse ? 0.6 : 0.4)
-            border.width: popup.visible && !popup.closing ? 1 : 0
+            border.width: (popup.visible && !popup.closing) || compact.activeFocus ? 1 : 0
             border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.6)
         }
 
@@ -62,23 +73,28 @@ PlasmoidItem {
             onClicked: popup.toggle()
         }
 
-        RowLayout {
+        GridLayout {
             id: row
             anchors.centerIn: parent
-            spacing: Math.round(compact.height * 0.18)
+            columns: compact.vertical ? 1 : 3
+            rowSpacing: 2
+            columnSpacing: Math.round(compact.refSize * 0.18)
 
             Kirigami.Icon {
-                Layout.preferredWidth: compact.height * 0.68
-                Layout.preferredHeight: compact.height * 0.68
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredWidth: compact.refSize * (compact.vertical ? 0.56 : 0.68)
+                Layout.preferredHeight: Layout.preferredWidth
                 source: root.ready ? weatherSource.iconFor(weatherSource.current.code, weatherSource.current.isDay)
                                    : "weather-none-available"
             }
             PC3.Label {
-                text: root.ready ? weatherSource.current.temp + "°" : (root.cfg.city ? "--°" : "Set city")
+                Layout.alignment: Qt.AlignHCenter
+                text: root.ready ? weatherSource.current.temp + "°" : (root.cfg.city ? "--°" : i18n("Set city"))
                 font.weight: Font.DemiBold
             }
             PC3.Label {
-                visible: root.cfg.showCity && root.ready
+                Layout.alignment: Qt.AlignHCenter
+                visible: root.cfg.showCity && root.ready && !compact.vertical
                 text: root.ready ? weatherSource.place : ""
                 opacity: 0.65
             }
@@ -90,6 +106,7 @@ PlasmoidItem {
             edge: Plasmoid.location
             gap: root.cfg.popupGap
             morph: root.cfg.popupMorph
+            morphDistance: root.cfg.popupMorphGap
             screenGeometry: Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0)
             style: root.cfg.popupStyle
             backgroundOpacity: root.cfg.popupOpacity

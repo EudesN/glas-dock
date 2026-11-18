@@ -48,16 +48,55 @@ Item {
     property bool animated: true
     property int animationDuration: 220
     property bool windowSlides: false
+    property bool morph: false
+    property real contentHeight: height
+    property real morphStartX: 0
+    property real morphStartY: contentHeight - 36
+    property real morphStartW: 48
+    property real morphStartH: 36
     // follows Plasma's global animation speed (0 when animations are off)
     readonly property int dur: Math.round(animationDuration * Kirigami.Units.longDuration / 200)
-    readonly property bool closing: closeAnim.running
+    readonly property bool closing: closeAnim.running || morphClose.running
     property real reveal: 1   // 0..1, content below the search field
+    property real t: 1        // 0 = dock-edge pill, 1 = full launcher
+    property real morphReveal: 1
 
     transformOrigin: Item.Bottom
     transform: Translate { id: rise; y: 0 }
 
+    function prepareClosedState() {
+        if (!animated || dur < 10)
+            return;
+        if (morph) {
+            opacity = 1; scale = 1; rise.y = 0; reveal = 1;
+            morphPanel.opacity = 0;
+            morphReveal = 0;
+            t = 0;
+        } else {
+            t = 1;
+            morphPanel.opacity = 1;
+            morphReveal = 1;
+            opacity = 0;
+            scale = windowSlides ? 0.98 : 0.94;
+            rise.y = windowSlides ? 0 : 16;
+            reveal = 0;
+        }
+    }
+
     function playOpen() {
         closeAnim.stop();
+        morphClose.stop();
+        if (morph && animated && dur >= 10) {
+            opacity = 1; scale = 1; rise.y = 0; reveal = 1;
+            morphPanel.opacity = 0;
+            morphReveal = 0;
+            t = 0;
+            morphOpen.restart();
+            return;
+        }
+        t = 1;
+        morphPanel.opacity = 1;
+        morphReveal = 1;
         if (!animated || dur < 10) {
             opacity = 1; scale = 1; rise.y = 0; reveal = 1;
             return;
@@ -70,14 +109,18 @@ Item {
     }
 
     function playClose() {
-        if (closeAnim.running)
+        if (closeAnim.running || morphClose.running)
             return;
         openAnim.stop();
-        if (!animated || dur < 10 || opacity === 0) {
+        morphOpen.stop();
+        if (!animated || dur < 10 || opacity === 0 || (morph && morphPanel.opacity === 0)) {
             closeFinished();
             return;
         }
-        closeAnim.restart();
+        if (morph)
+            morphClose.restart();
+        else
+            closeAnim.restart();
     }
 
     ParallelAnimation {
@@ -89,6 +132,29 @@ Item {
             PauseAnimation { duration: view.dur * 0.3 }
             NumberAnimation { target: view; property: "reveal"; to: 1; duration: view.dur; easing.type: Easing.OutCubic }
         }
+    }
+
+    ParallelAnimation {
+        id: morphOpen
+        NumberAnimation { target: morphPanel; property: "opacity"; to: 1; duration: Math.max(25, view.dur * 0.14); easing.type: Easing.OutCubic }
+        NumberAnimation { target: view; property: "t"; to: 1; duration: view.dur * 1.35; easing.type: Easing.OutQuart }
+        SequentialAnimation {
+            PauseAnimation { duration: view.dur * 0.42 }
+            NumberAnimation { target: view; property: "morphReveal"; to: 1; duration: view.dur * 0.85; easing.type: Easing.OutCubic }
+        }
+    }
+
+    SequentialAnimation {
+        id: morphClose
+        NumberAnimation { target: view; property: "morphReveal"; to: 0; duration: view.dur * 0.30; easing.type: Easing.InCubic }
+        ParallelAnimation {
+            NumberAnimation { target: view; property: "t"; to: 0; duration: view.dur * 0.95; easing.type: Easing.InOutCubic }
+            SequentialAnimation {
+                PauseAnimation { duration: view.dur * 0.55 }
+                NumberAnimation { target: morphPanel; property: "opacity"; to: 0; duration: view.dur * 0.40; easing.type: Easing.InCubic }
+            }
+        }
+        ScriptAction { script: view.closeFinished() }
     }
 
     SequentialAnimation {
@@ -106,7 +172,67 @@ Item {
 
     // -1 = Favorites, otherwise a row of rootModel (All Applications, categories…)
     property int currentCategory: -1
-    readonly property bool searching: search.text.length > 0
+    readonly property bool searching: search.text.trim().length > 0
+    // the query reaches the runners ~80 ms after the last keystroke
+    property string query: ""
+    // typed but results not in yet: no "No results" flash, Enter waits for them
+    readonly property bool searchPending: searching && (queryTimer.running || runnerModel.querying)
+    property bool launchWhenReady: false
+
+    Timer {
+        id: queryTimer
+        interval: 80
+        onTriggered: view.query = search.text.trim()
+    }
+
+    // Enter: launch now, or as soon as the pending search delivers results
+    function launchCurrent() {
+        if (searchPending) {
+            launchWhenReady = true;
+            if (queryTimer.running) {
+                queryTimer.stop();
+                view.query = search.text.trim();
+            }
+            return;
+        }
+        launch(grid.currentIndex);
+    }
+    onSearchPendingChanged: {
+        if (!searchPending && launchWhenReady) {
+            launchWhenReady = false;
+            launch(grid.currentIndex);
+        }
+    }
+
+    // Esc and type-to-search from any focused child (keys bubble up to here)
+    focus: true
+    Keys.onPressed: event => {
+        if (event.key === Qt.Key_Escape) {
+            if (search.text.length > 0) {
+                search.text = "";
+                search.forceActiveFocus();
+            } else {
+                view.closeRequested();
+            }
+            event.accepted = true;
+            return;
+        }
+        if (search.activeFocus || (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)))
+            return;
+        if (event.key === Qt.Key_Backspace) {
+            search.text = search.text.slice(0, -1);
+            search.forceActiveFocus();
+            event.accepted = true;
+            return;
+        }
+        // printable characters only (no control chars like \b, DEL, tab, return)
+        const t = event.text;
+        if (t.length > 0 && /^[^\x00-\x1f\x7f]+$/.test(t) && t.trim().length > 0) {
+            search.text += t;
+            search.forceActiveFocus();
+            event.accepted = true;
+        }
+    }
 
     readonly property var gridModel: {
         if (searching)
@@ -118,6 +244,9 @@ Item {
 
     function reset() {
         search.text = "";
+        queryTimer.stop();
+        query = "";
+        launchWhenReady = false;
         currentCategory = -1;
         grid.currentIndex = 0;
         search.forceActiveFocus();
@@ -158,36 +287,58 @@ Item {
         mergeResults: true
         runners: ["krunner_services", "krunner_systemsettings", "calculator",
                   "unitconverter", "krunner_sessions", "krunner_powerdevil"]
-        query: search.text
+        query: view.query
     }
 
     // ------------------------------------------------------------- background
-    Widgets.GlassSurface {
-        z: -1
-        anchors.fill: parent
-        style: view.style
-        backgroundOpacity: view.backgroundOpacity
-        radius: view.radius
-        isDark: view.isDark
-        accent: view.accent
-        accentTint: view.accentTint
-        showBorder: view.showBorder
-        showShadow: false        // the window has no room for it
-        forceBody: true
-        blurBehind: view.blurBehind
-        frost: view.frost
-    }
+    Item {
+        id: morphPanel
+        x: view.morph ? view.morphStartX + (0 - view.morphStartX) * view.t : 0
+        y: view.morph ? view.morphStartY + (0 - view.morphStartY) * view.t : 0
+        width: view.morph ? view.morphStartW + (view.width - view.morphStartW) * view.t : view.width
+        height: view.morph ? view.morphStartH + (view.contentHeight - view.morphStartH) * view.t : view.contentHeight
+        clip: view.morph && view.t < 1
 
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: Kirigami.Units.largeSpacing * 1.5
-        spacing: Kirigami.Units.largeSpacing
+        Widgets.GlassSurface {
+            z: -1
+            anchors.fill: parent
+            style: view.style
+            backgroundOpacity: view.backgroundOpacity
+            radius: view.morph && view.t < 1
+                ? Math.min(view.radius, height / 2) + (view.radius - Math.min(view.radius, height / 2)) * view.t
+                : view.radius
+            isDark: view.isDark
+            accent: view.accent
+            accentTint: view.accentTint
+            showBorder: view.showBorder
+            showShadow: false        // the window has no room for it
+            forceBody: true
+            blurBehind: view.blurBehind
+                && !(morphClose.running && (morphPanel.opacity < 0.95 || view.t < 0.65))
+                && !closeAnim.running
+            frost: view.frost
+        }
+
+        Item {
+            id: contentBox
+            x: -morphPanel.x
+            y: -morphPanel.y
+            width: view.width
+            height: view.contentHeight
+            opacity: view.morph ? view.morphReveal : 1
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Kirigami.Units.largeSpacing * 1.5
+                spacing: Kirigami.Units.largeSpacing
 
         // ------------------------------------------------------------ search
         PlasmaExtras.SearchField {
             id: search
             Layout.fillWidth: true
             focus: true
+            topPadding: 7
+            bottomPadding: 7
             Binding {
                 target: search
                 property: "Kirigami.Theme.inherit"
@@ -220,25 +371,44 @@ Item {
                 target: search.background
                 property: "opacity"
                 value: 0
-                when: search.background !== null && view.themeMode !== 0
+                when: search.background !== null
                 restoreMode: Binding.RestoreBindingOrValue
             }
             Rectangle {
-                visible: view.themeMode !== 0
                 z: -1
                 anchors.fill: parent
-                radius: Math.round(Kirigami.Units.cornerRadius * 1.5)
-                color: view.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.65)
+                radius: height / 2
+                color: search.activeFocus
+                    ? (view.isDark ? Qt.rgba(1, 1, 1, 0.11) : Qt.rgba(1, 1, 1, 0.78))
+                    : (view.isDark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.62))
                 border.width: 1
                 border.color: search.activeFocus
-                    ? view.accent
+                    ? Qt.rgba(view.accent.r, view.accent.g, view.accent.b, 0.75)
                     : (view.isDark ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(0, 0, 0, 0.14))
+                Behavior on color { ColorAnimation { duration: 120 } }
+                Behavior on border.color { ColorAnimation { duration: 120 } }
             }
-            onTextChanged: grid.currentIndex = 0
-            Keys.onEscapePressed: view.closeRequested()
-            Keys.onReturnPressed: view.launch(grid.currentIndex)
-            Keys.onEnterPressed: view.launch(grid.currentIndex)
+            onTextChanged: {
+                grid.currentIndex = 0;
+                if (text.trim().length === 0) {
+                    queryTimer.stop();
+                    view.query = "";
+                    view.launchWhenReady = false;
+                } else {
+                    queryTimer.restart();
+                }
+            }
+            Keys.onReturnPressed: view.launchCurrent()
+            Keys.onEnterPressed: view.launchCurrent()
             Keys.onDownPressed: { grid.forceActiveFocus(); }
+            Keys.onEscapePressed: event => {
+                if (search.text.length > 0) {
+                    search.text = "";
+                } else {
+                    view.closeRequested();
+                }
+                event.accepted = true;
+            }
         }
 
         RowLayout {
@@ -267,7 +437,7 @@ Item {
                         CategoryButton {
                             id: favBtn
                             width: parent.width
-                            text: "Favorites"
+                            text: i18n("Favorites")
                             iconSource: "bookmarks"
                             checked: view.currentCategory === -1
                             onClicked: view.currentCategory = -1
@@ -326,7 +496,7 @@ Item {
                 bottomMargin: 2
                 clip: true
                 model: view.gridModel
-                keyNavigationWraps: true
+                keyNavigationWraps: false
 
                 readonly property int boxMargin: 3
                 readonly property int hoverHeadroom: Math.ceil(view.iconSize * 0.04)
@@ -356,18 +526,17 @@ Item {
                 // the scrollbar sits beside the grid (not over the last column)
                 QQC2.ScrollBar.vertical: gridScroll
 
-                Keys.onReturnPressed: view.launch(currentIndex)
-                Keys.onEnterPressed: view.launch(currentIndex)
-                Keys.onEscapePressed: view.closeRequested()
-                Keys.onPressed: event => {
-                    // typing while the grid has focus goes to the search box
-                    if (event.text.length > 0 && event.text.trim().length > 0
-                            && !(event.modifiers & Qt.ControlModifier)) {
-                        search.text += event.text;
+                Keys.onReturnPressed: view.launchCurrent()
+                Keys.onEnterPressed: view.launchCurrent()
+                Keys.onUpPressed: event => {
+                    if (grid.currentIndex < grid.columns) {
                         search.forceActiveFocus();
                         event.accepted = true;
+                    } else {
+                        event.accepted = false;
                     }
                 }
+                // Esc and typing bubble up to the launcher root
 
                 delegate: Item {
                     id: cell
@@ -438,7 +607,7 @@ Item {
                             && rootModel.favoritesModel.isFavorite(cell.favoriteId)
 
                         PlasmaExtras.MenuItem {
-                            text: appMenu.isFav ? "Remove from Favorites" : "Add to Favorites"
+                            text: appMenu.isFav ? i18n("Remove from Favorites") : i18n("Add to Favorites")
                             icon: appMenu.isFav ? "bookmark-remove" : "bookmark-new"
                             onClicked: {
                                 if (appMenu.isFav)
@@ -448,21 +617,26 @@ Item {
                             }
                         }
                         PlasmaExtras.MenuItem {
-                            text: "Keep in Dock"
+                            text: i18n("Keep in Dock")
                             icon: "window-pin"
                             onClicked: view.pinRequested(cell.favoriteId)
                         }
                     }
                 }
 
+                // a GridView child scrolls with the content, so center on the
+                // view's own size via x/y instead of anchoring to the flickable
                 PlasmaExtras.PlaceholderMessage {
-                    anchors.centerIn: parent
-                    width: parent.width - Kirigami.Units.gridUnit * 4
-                    visible: grid.count === 0
+                    parent: grid
+                    x: (grid.width - width) / 2
+                    y: (grid.height - height) / 2
+                    z: 1
+                    width: grid.width - Kirigami.Units.gridUnit * 4
+                    visible: grid.count === 0 && !view.searchPending
                     iconName: view.searching ? "edit-none" : "bookmarks"
-                    text: view.searching ? "No results" : "No favorites yet"
+                    text: view.searching ? i18n("No results") : i18n("No favorites yet")
                     explanation: view.searching ? ""
-                        : "Right-click an app and choose “Add to Favorites”."
+                        : i18n("Right-click an app and choose “Add to Favorites”.")
                 }
             }
 
@@ -483,7 +657,7 @@ Item {
             Item { Layout.fillWidth: true }
 
             Widgets.GlassButton {
-                text: "Sleep"
+                text: i18n("Sleep")
                 iconName: "system-suspend"
                 iconSize: Kirigami.Units.iconSizes.small
                 isDark: view.isDark
@@ -491,30 +665,32 @@ Item {
                 onClicked: { view.closeRequested(); view.runCommand("systemctl suspend"); }
             }
             Widgets.GlassButton {
-                text: "Restart"
+                text: i18n("Restart")
                 iconName: "system-reboot"
                 iconSize: Kirigami.Units.iconSizes.small
                 isDark: view.isDark
                 accent: view.accent
-                onClicked: { view.closeRequested(); view.runCommand("qdbus6 org.kde.LogoutPrompt /LogoutPrompt org.kde.LogoutPrompt.promptReboot"); }
+                onClicked: { view.closeRequested(); view.runCommand("dbus-send --session --type=method_call --dest=org.kde.LogoutPrompt /LogoutPrompt org.kde.LogoutPrompt.promptReboot"); }
             }
             Widgets.GlassButton {
-                text: "Shut Down"
+                text: i18n("Shut Down")
                 iconName: "system-shutdown"
                 iconSize: Kirigami.Units.iconSizes.small
                 isDark: view.isDark
                 accent: view.accent
-                onClicked: { view.closeRequested(); view.runCommand("qdbus6 org.kde.LogoutPrompt /LogoutPrompt org.kde.LogoutPrompt.promptShutDown"); }
+                onClicked: { view.closeRequested(); view.runCommand("dbus-send --session --type=method_call --dest=org.kde.LogoutPrompt /LogoutPrompt org.kde.LogoutPrompt.promptShutDown"); }
             }
             Widgets.GlassButton {
-                text: "Log Out"
+                text: i18n("Log Out")
                 iconName: "system-log-out"
                 iconSize: Kirigami.Units.iconSizes.small
                 isDark: view.isDark
                 accent: view.accent
-                onClicked: { view.closeRequested(); view.runCommand("qdbus6 org.kde.LogoutPrompt /LogoutPrompt org.kde.LogoutPrompt.promptLogout"); }
+                onClicked: { view.closeRequested(); view.runCommand("dbus-send --session --type=method_call --dest=org.kde.LogoutPrompt /LogoutPrompt org.kde.LogoutPrompt.promptLogout"); }
             }
         }
+    }
+    }
     }
 
     component CategoryButton: PC3.ItemDelegate {
@@ -523,6 +699,9 @@ Item {
         readonly property int iconPx: Kirigami.Units.iconSizes.smallMedium + 2
         checkable: false
         highlighted: checked
+        // keep the keyboard in the search box (type-to-search, Enter, arrows)
+        focusPolicy: Qt.NoFocus
+        onReleased: search.forceActiveFocus()
         topPadding: 7
         bottomPadding: 7
         leftPadding: Kirigami.Units.largeSpacing + 2

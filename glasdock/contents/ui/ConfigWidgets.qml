@@ -16,47 +16,47 @@ KCM.SimpleKCM {
     Kirigami.FormLayout {
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: "Widgets after the apps (experimental)"
+            Kirigami.FormData.label: i18n("Widgets after the apps (experimental)")
         }
         QQC2.CheckBox {
             id: showPlayer
-            Kirigami.FormData.label: "Show:"
-            text: "Media player"
+            Kirigami.FormData.label: i18n("Show:")
+            text: i18n("Media player")
         }
         QQC2.CheckBox {
             id: showWeather
-            text: "Weather"
+            text: i18n("Weather")
         }
         QQC2.CheckBox {
             id: showClock
-            text: "Clock"
+            text: i18n("Clock")
         }
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: "Weather"
+            Kirigami.FormData.label: i18n("Weather")
         }
         QQC2.TextField {
             id: weatherCity
-            Kirigami.FormData.label: "City:"
+            Kirigami.FormData.label: i18n("City:")
             enabled: showWeather.checked
-            placeholderText: "e.g. Teresina"
+            placeholderText: i18n("e.g. Teresina")
         }
         QQC2.CheckBox {
             id: weatherFahrenheit
             enabled: showWeather.checked
-            text: "Use Fahrenheit"
+            text: i18n("Use Fahrenheit")
         }
         QQC2.CheckBox {
             id: weatherBadges
             enabled: showWeather.checked
-            text: "Glasdock badge icons (otherwise the icon theme's)"
+            text: i18n("Glasdock badge icons (otherwise the icon theme's)")
         }
         QQC2.Label {
             Layout.maximumWidth: Kirigami.Units.gridUnit * 22
             wrapMode: Text.WordWrap
             font: Kirigami.Theme.smallFont
             opacity: 0.7
-            text: "The city name is sent to Open-Meteo.com to find the forecast. For the top bar, use the separate Glasplayer and Glasweather widgets."
+            text: i18n("The city name is sent to Open-Meteo.com to find the forecast. For the top bar, use the separate Glasplayer and Glasweather widgets.")
         }
     }
 }

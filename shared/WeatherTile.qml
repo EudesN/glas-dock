@@ -11,6 +11,7 @@ Tile {
 
     property var weather: null
     readonly property bool ready: weather !== null && weather.ready
+    accessibleName: tile.ready ? (tile.weather.place + ", " + tile.weather.current.temp + "°") : i18n("Weather")
 
     RowLayout {
         anchors.centerIn: parent
@@ -33,7 +34,7 @@ Tile {
             PC3.Label {
                 Layout.maximumWidth: tile.width * 0.55
                 text: tile.ready ? tile.weather.place
-                                 : (tile.weather && tile.weather.error ? tile.weather.error : "Loading…")
+                                 : (tile.weather && tile.weather.error ? tile.weather.error : i18n("Loading…"))
                 font: Kirigami.Theme.smallFont
                 opacity: 0.6
                 elide: Text.ElideRight

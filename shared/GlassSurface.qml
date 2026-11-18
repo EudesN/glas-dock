@@ -37,6 +37,9 @@ Item {
     readonly property real bodyAlpha: st === 3 ? 1
         : st === 1 ? (blurActive ? Math.max(0.10, backgroundOpacity) : Math.max(0.45, backgroundOpacity))
         : st === 2 ? (blurActive ? 0.14 : 0.55)
+        // Glass: panels with text (forceBody) never go fully see-through,
+        // e.g. the launcher's default 0% opacity without a working blur
+        : forceBody ? Math.max(blurActive ? 0.08 : 0.40, backgroundOpacity)
         : backgroundOpacity
 
     // real blur behind (first, so everything else is drawn over it)
@@ -51,16 +54,22 @@ Item {
     readonly property real innerR: surface.showBorder ? Math.max(0, r - 1) : r
     readonly property real innerMargin: surface.showBorder ? 1 : 0
     // frost only makes sense on top of the real blur
-    readonly property real frostNow: blurOn ? frost : 0
+    readonly property real frostNow: blurActive ? frost : 0
     readonly property bool needsGrain: isFrosted || frostNow > 0
 
-    // Grain texture, tiled to the surface size (a stretched image showed up as
-    // vertical streaks on large surfaces such as the launcher). Only rendered
-    // when Frosted or Frost is actually active.
+    // Grain texture, tiled to a bucketed size covering the full container so
+    // morph/zoom animations never re-render the FBO on every frame. Only
+    // rendered when Frosted or Frost is actually active.
+    readonly property int grainW: surface.needsGrain
+        ? Math.ceil(Math.max(1, surface.width, surface.parent && surface.parent.parent ? surface.parent.parent.width : 0) / 256) * 256
+        : 1
+    readonly property int grainH: surface.needsGrain
+        ? Math.ceil(Math.max(1, surface.height, surface.parent && surface.parent.parent ? surface.parent.parent.height : 0) / 256) * 256
+        : 1
     Item {
         id: grainTile
-        width: surface.needsGrain ? Math.max(1, surface.width) : 1
-        height: surface.needsGrain ? Math.max(1, surface.height) : 1
+        width: surface.grainW
+        height: surface.grainH
         visible: false
         Image {
             anchors.fill: parent

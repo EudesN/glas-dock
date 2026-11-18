@@ -46,17 +46,22 @@ Item {
     property var _xhrEmbed: null
 
     // Pre-fetch and keep the active track's cover in Qt's pixmap cache at the
-    // exact size used by Cover.qml, so opening PlayerPopup shows it instantly.
+    // exact size used by PlayerPopup.qml and Cover.qml, so opening PlayerPopup
+    // shows it instantly.
     Image {
         visible: false
         source: playerProxy.artUrl
-        sourceSize: Qt.size(256, 256)
+        sourceSize: Qt.size(512, 512)
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         cache: true
     }
 
-    onRawTrackChanged: resolveSpotifyTrack()
+    onRawTrackChanged: {
+        resolveSpotifyTrack();
+        if (rawPlayer && rawPlayer.updatePosition)
+            Qt.callLater(() => { if (source.rawPlayer && source.rawPlayer.updatePosition) source.rawPlayer.updatePosition(); });
+    }
     onIsSpotifyTrackIdChanged: resolveSpotifyTrack()
 
     function _abortXhrs() {
@@ -161,6 +166,8 @@ Item {
 
     QtObject {
         id: playerProxy
+        // the player's own track id/title, stable while a Spotify id resolves
+        readonly property string trackKey: source.rawTrack
         readonly property string track: source.isSpotifyTrackId
             ? (source.resolvedTrack || (source.rawPlayer ? source.rawPlayer.identity : ""))
             : source.rawTrack
@@ -222,7 +229,11 @@ Item {
         interval: 80
         onTriggered: source._updateMatchedTask()
     }
-    onRawPlayerChanged: _updateMatchedTask()
+    onRawPlayerChanged: {
+        _updateMatchedTask();
+        if (rawPlayer && rawPlayer.updatePosition)
+            Qt.callLater(() => { if (source.rawPlayer && source.rawPlayer.updatePosition) source.rawPlayer.updatePosition(); });
+    }
 
     function _findTaskRow(raw) {
         if (!raw)
@@ -331,7 +342,8 @@ Item {
             }
         }
         const next = multiplexer || playing || queued || any;
-        if (rawPlayer !== next)
-            rawPlayer = next;
+        // always assign: when the chosen player is removed its var reference
+        // goes stale, and a guarded assignment could skip the update
+        rawPlayer = next;
     }
 }

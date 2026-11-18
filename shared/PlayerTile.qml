@@ -13,6 +13,9 @@ Tile {
     property var player: null
     readonly property bool hasPlayer: player !== null && player !== undefined
     readonly property bool playing: hasPlayer && player.playbackStatus === Mpris.PlaybackStatus.Playing
+    accessibleName: tile.hasPlayer
+        ? ((tile.player.track || tile.player.identity) + (tile.player.artist ? " — " + tile.player.artist : ""))
+        : i18n("Media player")
 
     onMiddleClicked: if (hasPlayer) player.playPause()
 
@@ -75,12 +78,8 @@ Tile {
         }
     }
 
+    WheelSkipper { id: wheelSkipper; player: tile.hasPlayer ? tile.player : null }
     WheelHandler {
-        onWheel: event => {
-            if (!tile.hasPlayer)
-                return;
-            if (event.angleDelta.y > 0 && tile.player.canGoPrevious) tile.player.previous();
-            else if (event.angleDelta.y < 0 && tile.player.canGoNext) tile.player.next();
-        }
+        onWheel: event => wheelSkipper.handle(event.angleDelta.y)
     }
 }

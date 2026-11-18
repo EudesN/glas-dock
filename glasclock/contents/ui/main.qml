@@ -21,13 +21,30 @@ PlasmoidItem {
 
     property date now: new Date()
     Timer {
-        // every second when seconds are shown, otherwise on the minute
-        interval: root.cfg.showSeconds
-            ? 1000 : Math.max(1000, (60 - root.now.getSeconds()) * 1000 - root.now.getMilliseconds() + 50)
-        running: true
-        repeat: true
+        // Single-shot, re-armed from the real time on every tick so it lands just
+        // after each second/minute boundary. Qt timers stop counting during
+        // suspend, so in minute mode it also wakes at least every 5 s: after a
+        // resume the clock is right within 5 s instead of up to a minute late.
+        id: clockTimer
+        repeat: false
         triggeredOnStart: true
-        onTriggered: root.now = new Date()
+        running: true
+        onTriggered: {
+            const d = new Date();
+            const sec = root.cfg.showSeconds;
+            // only touch `now` when the shown text can change (no needless rebinds)
+            if (sec || d.getMinutes() !== root.now.getMinutes() || d.getHours() !== root.now.getHours()
+                    || d.getDate() !== root.now.getDate())
+                root.now = d;
+            const toNextSecond = 1000 - d.getMilliseconds() + 20;
+            interval = sec ? toNextSecond
+                : Math.min(5000, (59 - d.getSeconds()) * 1000 + toNextSecond);
+            restart();
+        }
+    }
+    Connections {
+        target: root.cfg
+        function onShowSecondsChanged() { clockTimer.interval = 1; clockTimer.restart(); }
     }
 
     // 0 = follow the locale, 1 = 12-hour, 2 = 24-hour
@@ -164,22 +181,32 @@ PlasmoidItem {
         id: compact
 
         Shared.ThemeScope { target: compact; themeMode: root.cfg.themeMode }
-        readonly property real pad: Math.round(height * 0.12)
-        readonly property bool stacked: root.cfg.showDate && (root.cfg.twoLines || height >= 44)
+        readonly property bool vertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
+        readonly property real pad: Math.round((vertical ? width : height) * 0.12)
+        readonly property bool stacked: root.cfg.showDate && (vertical || root.cfg.twoLines || height >= 44)
 
-        Layout.preferredWidth: Math.ceil(content.implicitWidth) + pad * (root.cfg.pillBackground ? 4 : 2) + 4
-        Layout.minimumWidth: Layout.preferredWidth
-        Layout.fillHeight: true
+        activeFocusOnTab: true
+        Accessible.role: Accessible.Button
+        Accessible.name: root.timeText(root.now) + ", " + root.toolTipMainText
+        Keys.onReturnPressed: popup.toggle()
+        Keys.onSpacePressed: popup.toggle()
+
+        Layout.preferredWidth: vertical ? -1 : Math.ceil(content.implicitWidth) + pad * (root.cfg.pillBackground ? 4 : 2) + 4
+        Layout.minimumWidth: vertical ? 0 : Layout.preferredWidth
+        Layout.preferredHeight: vertical ? Math.ceil(content.implicitHeight) + pad * 2 + 4 : -1
+        Layout.minimumHeight: vertical ? Layout.preferredHeight : 0
+        Layout.fillWidth: vertical
+        Layout.fillHeight: !vertical
 
         Rectangle {
             visible: root.cfg.pillBackground
             anchors.fill: parent
             anchors.topMargin: compact.pad / 2
             anchors.bottomMargin: compact.pad / 2
-            radius: height / 2
+            radius: Math.min(width, height) / 2
             color: root.isDark ? Qt.rgba(1, 1, 1, area.containsMouse ? 0.14 : 0.08)
                                : Qt.rgba(1, 1, 1, area.containsMouse ? 0.6 : 0.4)
-            border.width: popup.visible && !popup.closing ? 1 : 0
+            border.width: (popup.visible && !popup.closing) || compact.activeFocus ? 1 : 0
             border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.6)
         }
 
@@ -193,12 +220,16 @@ PlasmoidItem {
         GridLayout {
             id: content
             anchors.centerIn: parent
+            width: compact.vertical ? Math.max(0, compact.width - compact.pad * 2) : implicitWidth
             columns: compact.stacked ? 1 : 2
             rowSpacing: 0
             columnSpacing: Math.round(compact.height * 0.25)
 
             PC3.Label {
                 Layout.alignment: Qt.AlignHCenter
+                Layout.fillWidth: compact.vertical
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
                 text: root.timeText(root.now)
                 font.weight: Font.DemiBold
                 font.features: { "tnum": 1 }      // digits don't jump around
@@ -206,7 +237,10 @@ PlasmoidItem {
             PC3.Label {
                 visible: root.cfg.showDate
                 Layout.alignment: Qt.AlignHCenter
-                text: root.now.toLocaleDateString(Qt.locale(), "ddd, d MMM")
+                Layout.fillWidth: compact.vertical
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                text: root.now.toLocaleDateString(Qt.locale(), i18n("ddd, d MMM"))
                 opacity: 0.65
                 font: compact.stacked ? Kirigami.Theme.smallFont : Kirigami.Theme.defaultFont
             }
@@ -218,6 +252,7 @@ PlasmoidItem {
             edge: Plasmoid.location
             gap: root.cfg.popupGap
             morph: root.cfg.popupMorph
+            morphDistance: root.cfg.popupMorphGap
             screenGeometry: Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0)
             style: root.cfg.popupStyle
             backgroundOpacity: root.cfg.popupOpacity

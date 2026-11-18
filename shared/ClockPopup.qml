@@ -60,7 +60,7 @@ Item {
             }
             Item { Layout.fillWidth: true }
             PC3.Label {
-                text: Math.round(popup.dayProgress * 100) + "% of the day"
+                text: i18n("%1% of the day", Math.round(popup.dayProgress * 100))
                 opacity: 0.5
                 font: Kirigami.Theme.smallFont
             }
@@ -87,8 +87,8 @@ Item {
             spacing: Kirigami.Units.smallSpacing
             Repeater {
                 model: [
-                    "Day " + popup.dayOfYear,
-                    "Week " + popup.weekNumber,
+                    i18n("Day %1", popup.dayOfYear),
+                    i18n("Week %1", popup.weekNumber),
                     Qt.formatDate(popup.now, "yyyy")
                 ]
                 delegate: Rectangle {

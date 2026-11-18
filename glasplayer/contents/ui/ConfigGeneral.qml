@@ -21,14 +21,15 @@ KCM.SimpleKCM {
     property alias cfg_popupAnimation: popupAnimation.checked
     property alias cfg_popupGap: popupGap.value
     property alias cfg_popupMorph: popupMorph.checked
+    property alias cfg_popupMorphGap: popupMorphGap.value
 
     Kirigami.FormLayout {
         Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Panel" }
 
         QQC2.SpinBox {
             id: maxWidth
-            Kirigami.FormData.label: "Maximum width:"
-            from: 120; to: 800; stepSize: 10
+            Kirigami.FormData.label: i18n("Maximum width:")
+            from: 120; to: 800; stepSize: 10; editable: true
             textFromValue: v => v + " px"
             valueFromText: t => parseInt(t)
         }
@@ -62,15 +63,15 @@ KCM.SimpleKCM {
         }
         QQC2.SpinBox {
             id: popupRadius
-            Kirigami.FormData.label: "Corner radius:"
-            from: 0; to: 48
+            Kirigami.FormData.label: i18n("Corner radius:")
+            from: 0; to: 48; editable: true
             textFromValue: v => v + " px"
             valueFromText: t => parseInt(t)
         }
         QQC2.SpinBox {
             id: popupGap
             Kirigami.FormData.label: "Distance from the widget:"
-            from: -8; to: 60
+            from: -8; to: 60; editable: true
             textFromValue: v => v + " px"
             valueFromText: t => parseInt(t)
         }
@@ -79,6 +80,14 @@ KCM.SimpleKCM {
             id: popupMorph
             enabled: popupAnimation.checked
             text: "Grow out of the widget (experimental)"
+        }
+        QQC2.SpinBox {
+            id: popupMorphGap
+            Kirigami.FormData.label: "Grow origin distance:"
+            enabled: popupAnimation.checked && popupMorph.checked
+            from: -24; to: 60; editable: true
+            textFromValue: v => v + " px"
+            valueFromText: t => parseInt(t)
         }
 
         // ---- real blur (org.glasdock.blur helper plugin)

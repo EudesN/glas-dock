@@ -12,6 +12,7 @@ Rectangle {
 
     property string iconName: ""
     property string text: ""
+    property string accessibleName: text
     property bool filled: false
     property bool isDark: true
     property color accent: Kirigami.Theme.highlightColor
@@ -19,10 +20,18 @@ Rectangle {
 
     signal clicked()
 
+    activeFocusOnTab: enabled
+    Accessible.role: Accessible.Button
+    Accessible.name: accessibleName
+    Keys.onReturnPressed: if (enabled) clicked()
+    Keys.onSpacePressed: if (enabled) clicked()
+
     implicitHeight: Math.round(iconSize * 2)
     implicitWidth: text.length > 0 ? row.implicitWidth + implicitHeight : implicitHeight
     radius: height / 2
     opacity: enabled ? 1 : 0.4
+    border.width: activeFocus ? 1.5 : 0
+    border.color: accent
 
     readonly property color fg: filled
         ? (Kirigami.ColorUtils.brightnessForColor(accent) === Kirigami.ColorUtils.Light ? "#1d1d1f" : "white")

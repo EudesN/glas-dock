@@ -20,70 +20,70 @@ KCM.SimpleKCM {
     Kirigami.FormLayout {
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: "Hover"
+            Kirigami.FormData.label: i18n("Hover")
         }
         QQC2.CheckBox {
             id: showPreviews
-            Kirigami.FormData.label: "Previews:"
-            text: "Show live window previews"
+            Kirigami.FormData.label: i18n("Previews:")
+            text: i18n("Show live window previews")
         }
         QQC2.SpinBox {
             id: previewWidth
-            Kirigami.FormData.label: "Preview size:"
+            Kirigami.FormData.label: i18n("Preview size:")
             enabled: showPreviews.checked
-            from: 140; to: 480; stepSize: 20
+            from: 140; to: 480; stepSize: 20; editable: true
             textFromValue: v => v + " px"
             valueFromText: t => parseInt(t)
         }
         QQC2.CheckBox {
             id: showLabels
-            Kirigami.FormData.label: "Names:"
-            text: "Show the app name"
+            Kirigami.FormData.label: i18n("Names:")
+            text: i18n("Show the app name")
         }
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: "Zoom"
+            Kirigami.FormData.label: i18n("Zoom")
         }
         RowLayout {
-            Kirigami.FormData.label: "Maximum zoom:"
+            Kirigami.FormData.label: i18n("Maximum zoom:")
             QQC2.Slider { id: maxZoom; from: 1.0; to: 2.5; stepSize: 0.05 }
             QQC2.Label { text: maxZoom.value.toFixed(2) + "×" }
         }
         RowLayout {
-            Kirigami.FormData.label: "Zoom reach:"
+            Kirigami.FormData.label: i18n("Zoom reach:")
             QQC2.Slider { id: zoomRange; from: 1.0; to: 5.0; stepSize: 0.1 }
-            QQC2.Label { text: zoomRange.value.toFixed(1) + " icons" }
+            QQC2.Label { text: i18n("%1 icons", zoomRange.value.toFixed(1)) }
         }
         QQC2.CheckBox {
             id: centeredZoom
-            text: "Keep the dock centered while zooming"
+            text: i18n("Keep the dock centered while zooming")
         }
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: "Notifications"
+            Kirigami.FormData.label: i18n("Notifications")
         }
         QQC2.CheckBox {
             id: showBadges
-            Kirigami.FormData.label: "Badges:"
-            text: "Show a badge on apps with unread notifications"
+            Kirigami.FormData.label: i18n("Badges:")
+            text: i18n("Show a badge on apps with unread notifications")
         }
         QQC2.CheckBox {
             id: badgeUseAccent
             enabled: showBadges.checked
-            text: "Use the system accent color (otherwise red)"
+            text: i18n("Use the system accent color (otherwise red)")
         }
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: "Apps"
+            Kirigami.FormData.label: i18n("Apps")
         }
         QQC2.CheckBox {
             id: allowReorder
-            Kirigami.FormData.label: "Icons:"
-            text: "Drag icons to reorder them"
+            Kirigami.FormData.label: i18n("Icons:")
+            text: i18n("Drag icons to reorder them")
         }
         QQC2.CheckBox {
             id: onlyCurrentDesktop
-            text: "Only show windows from the current desktop"
+            text: i18n("Only show windows from the current desktop")
         }
     }
 }

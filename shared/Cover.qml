@@ -32,7 +32,7 @@ Item {
         source: cover.art
         // Fixed sourceSize so layout changes never abort/restart loading and
         // MprisSource's background prefetcher shares the same QQuickPixmapCache entry
-        sourceSize: Qt.size(256, 256)
+        sourceSize: Qt.size(512, 512)
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         cache: true

@@ -139,7 +139,7 @@ Item {
                         PC3.Label {
                             id: weekLbl
                             anchors.centerIn: parent
-                            text: "Week " + popup.weekOf(popup.now)
+                            text: i18n("Week %1", popup.weekOf(popup.now))
                             color: popup.accent
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             font.weight: Font.DemiBold
@@ -167,7 +167,7 @@ Item {
 
                 Shared.GlassButton {
                     visible: calendar.month !== popup.now.getMonth() + 1 || calendar.year !== popup.now.getFullYear()
-                    text: "Today"
+                    text: i18n("Today")
                     iconSize: Kirigami.Units.iconSizes.small
                     isDark: popup.isDark
                     accent: popup.accent
@@ -178,6 +178,7 @@ Item {
                 }
                 Shared.GlassButton {
                     iconName: "go-previous"
+                    accessibleName: i18n("Previous month")
                     iconSize: Kirigami.Units.iconSizes.small
                     isDark: popup.isDark
                     onClicked: calendar.previousMonth()
@@ -191,6 +192,7 @@ Item {
                 }
                 Shared.GlassButton {
                     iconName: "go-next"
+                    accessibleName: i18n("Next month")
                     iconSize: Kirigami.Units.iconSizes.small
                     isDark: popup.isDark
                     onClicked: calendar.nextMonth()
@@ -230,14 +232,14 @@ Item {
                         PC3.Label {
                             visible: dayBlock.index > 0 || !popup.sameDay(dayBlock.modelData.date, popup.now)
                             Layout.topMargin: dayBlock.index > 0 ? Kirigami.Units.smallSpacing : 0
-                            text: dayBlock.modelData.date.toLocaleDateString(Qt.locale(), "ddd, MMM d").toUpperCase()
+                            text: dayBlock.modelData.date.toLocaleDateString(Qt.locale(), i18n("ddd, d MMM")).toUpperCase()
                             color: popup.dim
                             font: Kirigami.Theme.smallFont
                         }
 
                         PC3.Label {
                             visible: dayBlock.modelData.events.length === 0
-                            text: "No events"
+                            text: i18n("No events")
                             color: popup.dim
                         }
 
@@ -279,7 +281,7 @@ Item {
                                     }
                                     PC3.Label {
                                         Layout.fillWidth: true
-                                        text: card.modelData.isAllDay ? "All day"
+                                        text: card.modelData.isAllDay ? i18n("All day")
                                             : popup.timeText(card.modelData.startDateTime) + " – " + popup.timeText(card.modelData.endDateTime)
                                         color: Qt.rgba(card.tone.r, card.tone.g, card.tone.b, 0.85)
                                         font: Kirigami.Theme.smallFont

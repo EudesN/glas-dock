@@ -10,6 +10,7 @@ Rectangle {
 
     property bool isDark: true
     property bool active: false   // its panel is open
+    property string accessibleName: ""
     readonly property alias hovered: area.containsMouse
     readonly property alias pressed: area.pressed
     default property alias content: inner.data
@@ -17,10 +18,16 @@ Rectangle {
     signal clicked()
     signal middleClicked()
 
+    activeFocusOnTab: visible
+    Accessible.role: Accessible.Button
+    Accessible.name: accessibleName
+    Keys.onReturnPressed: clicked()
+    Keys.onSpacePressed: clicked()
+
     radius: Math.round(height * 0.24)
     color: isDark ? Qt.rgba(1, 1, 1, active ? 0.18 : hovered ? 0.13 : 0.08)
                   : Qt.rgba(1, 1, 1, active ? 0.72 : hovered ? 0.58 : 0.40)
-    border.width: active ? 1 : 0
+    border.width: (active || activeFocus) ? 1 : 0
     border.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g,
                           Kirigami.Theme.highlightColor.b, 0.65)
     Behavior on color { ColorAnimation { duration: 120 } }

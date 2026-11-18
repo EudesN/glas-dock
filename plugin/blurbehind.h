@@ -41,7 +41,7 @@ private:
     void checkSceneRect();
     void scheduleApply();
     void apply();
-    static void updateWindow(QQuickWindow *window);
+    static void updateWindow(QQuickWindow *window, bool force = false);
 
     bool m_active = true;
     qreal m_radius = 0;

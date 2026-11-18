@@ -32,7 +32,7 @@ Item {
             visible: !popup.ready
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
-            text: popup.weather && popup.weather.error ? popup.weather.error : "Loading…"
+            text: popup.weather && popup.weather.error ? popup.weather.error : i18n("Loading…")
             opacity: 0.7
         }
 
@@ -60,9 +60,19 @@ Item {
                 }
                 PC3.Label {
                     visible: popup.today !== null
-                    text: popup.today ? "H: " + popup.today.max + "°  ·  L: " + popup.today.min + "°" : ""
+                    text: popup.today ? i18n("H: %1°  ·  L: %2°", popup.today.max, popup.today.min) : ""
                     font: Kirigami.Theme.smallFont
                     opacity: 0.55
+                }
+                // which place matched (state, country) and how fresh the data is
+                PC3.Label {
+                    readonly property string info: popup.ready
+                        ? [popup.weather.region, popup.weather.updatedText].filter(v => v).join("  ·  ") : ""
+                    visible: info.length > 0
+                    text: info
+                    font: Kirigami.Theme.smallFont
+                    color: popup.weather && popup.weather.stale ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.textColor
+                    opacity: popup.weather && popup.weather.stale ? 0.9 : 0.55
                 }
             }
             Item { Layout.fillWidth: true }
@@ -75,7 +85,7 @@ Item {
             spacing: Kirigami.Units.smallSpacing
             Repeater {
                 model: popup.ready ? [
-                    { icon: "temperature-normal", text: "Feels " + popup.weather.current.feels + "°" },
+                    { icon: "temperature-normal", text: i18n("Feels %1°", popup.weather.current.feels) },
                     { icon: "raindrop", text: popup.weather.current.humidity + "%" },
                     { icon: "speedometer", text: popup.weather.current.wind + " " + popup.weather.current.windUnit }
                 ] : []
@@ -165,7 +175,7 @@ Item {
 
         PC3.Label {
             Layout.alignment: Qt.AlignRight
-            text: "Weather data by Open-Meteo.com"
+            text: i18n("Weather data by Open-Meteo.com")
             font: Kirigami.Theme.smallFont
             opacity: 0.4
         }

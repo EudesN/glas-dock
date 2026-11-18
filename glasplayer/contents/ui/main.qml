@@ -36,7 +36,7 @@ PlasmoidItem {
     preferredRepresentation: fullRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     Plasmoid.status: hidden ? PlasmaCore.Types.PassiveStatus : PlasmaCore.Types.ActiveStatus
-    toolTipMainText: hasMedia ? (player.track || player.identity) : "Media player"
+    toolTipMainText: hasMedia ? (player.track || player.identity) : i18n("Media player")
     toolTipSubText: hasMedia ? (player.artist || "") : ""
 
     fullRepresentation: Item {
@@ -44,14 +44,33 @@ PlasmoidItem {
 
         Shared.ThemeScope { target: compact; themeMode: root.cfg.themeMode }
         readonly property bool collapsed: root.hidden
-        readonly property real pad: Math.round(height * 0.12)
+        readonly property bool vertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
+        readonly property real pad: Math.round((vertical ? width : height) * 0.12)
+
+        activeFocusOnTab: !collapsed
+        Accessible.role: Accessible.Button
+        Accessible.name: root.toolTipMainText + (root.toolTipSubText ? " — " + root.toolTipSubText : "")
+        Keys.onReturnPressed: {
+            if (root.hasPlayer)
+                root.player.updatePosition();
+            popup.toggle();
+        }
+        Keys.onSpacePressed: {
+            if (root.hasPlayer)
+                root.player.updatePosition();
+            popup.toggle();
+        }
 
         // (+ a few px so sub-pixel rounding doesn't elide text that fits)
-        Layout.preferredWidth: collapsed ? 0 : Math.min(root.cfg.maxWidth,
-            Math.ceil(row.implicitWidth) + row.anchors.leftMargin + row.anchors.rightMargin + 4)
-        Layout.minimumWidth: Layout.preferredWidth
-        Layout.maximumWidth: Layout.preferredWidth
-        Layout.fillHeight: true
+        Layout.preferredWidth: collapsed ? 0 : (vertical ? -1 : Math.min(root.cfg.maxWidth,
+            Math.ceil(row.implicitWidth) + row.anchors.leftMargin + row.anchors.rightMargin + 4))
+        Layout.minimumWidth: vertical ? 0 : Layout.preferredWidth
+        Layout.maximumWidth: vertical ? (collapsed ? 0 : Infinity) : Layout.preferredWidth
+        Layout.preferredHeight: collapsed ? 0 : (vertical ? width : -1)
+        Layout.minimumHeight: vertical ? Layout.preferredHeight : 0
+        Layout.maximumHeight: vertical ? Layout.preferredHeight : Infinity
+        Layout.fillWidth: vertical && !collapsed
+        Layout.fillHeight: !vertical
         visible: !collapsed
 
         // optional glass pill behind the widget
@@ -60,35 +79,46 @@ PlasmoidItem {
             anchors.fill: parent
             anchors.topMargin: compact.pad / 2
             anchors.bottomMargin: compact.pad / 2
-            radius: height / 2
+            radius: Math.min(width, height) / 2
             color: root.isDark ? Qt.rgba(1, 1, 1, hover.hovered ? 0.14 : 0.08)
                                : Qt.rgba(1, 1, 1, hover.hovered ? 0.6 : 0.4)
-            border.width: popup.visible && !popup.closing ? 1 : 0
+            border.width: (popup.visible && !popup.closing) || compact.activeFocus ? 1 : 0
             border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.6)
         }
 
-        HoverHandler { id: hover }
+        HoverHandler {
+            id: hover
+            onHoveredChanged: if (hovered && root.hasPlayer) root.player.updatePosition()
+        }
 
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton | Qt.MiddleButton
             onClicked: mouse => {
-                if (mouse.button === Qt.MiddleButton && root.hasPlayer)
+                if (mouse.button === Qt.MiddleButton && root.hasPlayer) {
                     root.player.playPause();
-                else
+                } else {
+                    if (root.hasPlayer)
+                        root.player.updatePosition();
                     popup.toggle();
+                }
             }
-            onWheel: wheel => {
-                // scroll to skip tracks
-                if (!root.hasPlayer)
-                    return;
-                if (wheel.angleDelta.y > 0 && root.player.canGoPrevious) root.player.previous();
-                else if (wheel.angleDelta.y < 0 && root.player.canGoNext) root.player.next();
-            }
+            // scroll to skip tracks (one gesture = one skip)
+            Shared.WheelSkipper { id: wheelSkipper; player: root.hasPlayer ? root.player : null }
+            onWheel: wheel => wheelSkipper.handle(wheel.angleDelta.y)
+        }
+
+        Shared.Cover {
+            visible: compact.vertical
+            anchors.centerIn: parent
+            width: Math.max(16, Math.min(compact.width, compact.height) - compact.pad * 2)
+            height: width
+            player: root.player
         }
 
         RowLayout {
             id: row
+            visible: !compact.vertical
             anchors.fill: parent
             anchors.leftMargin: compact.pad * (root.cfg.pillBackground ? 2 : 1)
             anchors.rightMargin: compact.pad * (root.cfg.pillBackground ? 2 : 1)
@@ -101,7 +131,7 @@ PlasmoidItem {
                 Layout.preferredWidth: implicitWidth
                 Layout.fillHeight: true
                 scrolling: hover.hovered
-                text: !root.hasMedia ? "Media player"
+                text: !root.hasMedia ? i18n("Media player")
                     : (root.player.track || root.player.identity)
                       + (root.cfg.showArtist && root.player.artist ? "  ·  " + root.player.artist : "")
             }
@@ -172,6 +202,8 @@ PlasmoidItem {
             edge: Plasmoid.location
             gap: root.cfg.popupGap
             morph: root.cfg.popupMorph
+            morphDistance: root.cfg.popupMorphGap
+            contentPadding: 0
             screenGeometry: Plasmoid.containment ? Plasmoid.containment.screenGeometry : Qt.rect(0, 0, 0, 0)
             style: root.cfg.popupStyle
             backgroundOpacity: root.cfg.popupOpacity
@@ -186,6 +218,7 @@ PlasmoidItem {
                 player: root.player
                 accent: root.accent
                 isDark: root.isDark
+                cardRadius: root.cfg.popupRadius
                 onCloseRequested: popup.close()
             }
         }

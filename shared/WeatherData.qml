@@ -15,43 +15,85 @@ Item {
     property bool fahrenheit: false
 
     property string place: ""
+    property string region: ""      // "State, Country" of the matched place
     property real latitude: NaN
     property real longitude: NaN
     property var current: null    // { temp, feels, humidity, wind, code, isDay }
     property var daily: []        // [{ date, min, max, code }]
-    property string error: "Set a city in the settings"
+    property string error: i18n("Set a city in the settings")
     readonly property bool ready: current !== null
+    // the city name gave no match: don't keep asking the geocoder every minute
+    property bool cityNotFound: false
+    // time of the last successful forecast (ms since epoch, 0 = never)
+    property double lastUpdated: 0
+    // the shown data is older than two missed refreshes (e.g. offline)
+    readonly property bool stale: ready && _now - lastUpdated > 35 * 60 * 1000
+    readonly property string updatedText: {
+        if (lastUpdated <= 0)
+            return "";
+        const t = Qt.formatTime(new Date(lastUpdated), Qt.locale().timeFormat(Locale.ShortFormat));
+        return stale ? i18n("Offline · updated %1", t) : i18n("Updated %1", t);
+    }
+    property double _now: Date.now()
+    readonly property bool busy: _xhrs.geo !== null || _xhrs.forecast !== null
 
     onCityChanged: geocode()
     onFahrenheitChanged: if (ready) fetch()
 
-    property var _activeXhr: null
+    // one request slot per kind, so a refresh never aborts a geocode (or the
+    // other way round); a new request only replaces one of the same kind
+    property var _xhrs: ({ geo: null, forecast: null })
 
-    function request(url, done) {
-        if (_activeXhr) {
-            _activeXhr.onreadystatechange = null;
-            _activeXhr.abort();
+    function _setSlot(slot, xhr) {
+        const x = Object.assign({}, _xhrs);
+        x[slot] = xhr;
+        _xhrs = x;
+    }
+
+    function request(slot, url, done) {
+        const old = _xhrs[slot];
+        if (old) {
+            old.onreadystatechange = null;
+            old.abort();
         }
         const xhr = new XMLHttpRequest();
-        _activeXhr = xhr;
+        _setSlot(slot, xhr);
         xhr.timeout = 10000;
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== XMLHttpRequest.DONE)
                 return;
-            if (_activeXhr === xhr)
-                _activeXhr = null;
+            if (data._xhrs[slot] === xhr)
+                data._setSlot(slot, null);
             if (xhr.status !== 200) {
-                data.error = "Weather unavailable";
+                data.error = i18n("Weather unavailable");
                 return;
             }
             try {
                 done(JSON.parse(xhr.responseText));
             } catch (e) {
-                data.error = "Weather unavailable";
+                data.error = i18n("Weather unavailable");
             }
         };
         xhr.open("GET", url);
         xhr.send();
+    }
+
+    // "Paris", "Paris, FR", "Springfield, Illinois" -> { name, qualifier }
+    function parseCity(text) {
+        const parts = text.split(",").map(p => p.trim()).filter(p => p.length > 0);
+        return { name: parts[0] || "", qualifier: parts.slice(1).join(", ") };
+    }
+
+    // best geocoding result for the qualifier (country code, country or state)
+    function pickResult(results, qualifier) {
+        if (!qualifier)
+            return results[0];
+        const q = qualifier.toLowerCase();
+        const match = results.find(r =>
+            (r.country_code || "").toLowerCase() === q
+            || (r.country || "").toLowerCase().startsWith(q)
+            || (r.admin1 || "").toLowerCase().startsWith(q));
+        return match || null;
     }
 
     function geocode() {
@@ -60,20 +102,31 @@ Item {
         current = null;
         daily = [];
         error = "";
-        if (city.trim().length === 0) {
-            error = "Set a city in the settings";
+        place = "";
+        region = "";
+        cityNotFound = false;
+        lastUpdated = 0;
+        const c = parseCity(city);
+        if (c.name.length === 0) {
+            error = i18n("Set a city in the settings");
             return;
         }
-        request("https://geocoding-api.open-meteo.com/v1/search?count=1&format=json&name="
-                + encodeURIComponent(city.trim()), json => {
-            if (!json.results || json.results.length === 0) {
-                data.error = "City not found";
+        // names in the system language; more candidates when a qualifier must pick one
+        const lang = Qt.locale().name.split("_")[0] || "en";
+        request("geo", "https://geocoding-api.open-meteo.com/v1/search?format=json"
+                + "&count=" + (c.qualifier ? 20 : 1)
+                + "&language=" + encodeURIComponent(lang)
+                + "&name=" + encodeURIComponent(c.name), json => {
+            const r = json.results && json.results.length > 0 ? data.pickResult(json.results, c.qualifier) : null;
+            if (!r) {
+                data.cityNotFound = true;
+                data.error = i18n("City not found");
                 return;
             }
-            const r = json.results[0];
             data.latitude = r.latitude;
             data.longitude = r.longitude;
             data.place = r.name;
+            data.region = [r.admin1, r.country].filter(v => v && v !== r.name).join(", ");
             data.fetch();
         });
     }
@@ -81,7 +134,7 @@ Item {
     function fetch() {
         if (isNaN(latitude) || isNaN(longitude))
             return;
-        request("https://api.open-meteo.com/v1/forecast?latitude=" + latitude
+        request("forecast", "https://api.open-meteo.com/v1/forecast?latitude=" + latitude
                 + "&longitude=" + longitude
                 + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day"
                 + "&daily=weather_code,temperature_2m_max,temperature_2m_min"
@@ -102,6 +155,8 @@ Item {
                 code: c.weather_code,
                 isDay: c.is_day === 1
             };
+            data.lastUpdated = Date.now();
+            data._now = data.lastUpdated;
             data.error = "";
         });
     }
@@ -143,25 +198,34 @@ Item {
     }
 
     function describe(code) {
-        if (code === 0) return "Clear";
-        if (code === 1) return "Mostly clear";
-        if (code === 2) return "Partly cloudy";
-        if (code === 3) return "Overcast";
-        if (code === 45 || code === 48) return "Fog";
-        if (code >= 51 && code <= 57) return "Drizzle";
-        if (code >= 61 && code <= 67) return "Rain";
-        if (code >= 71 && code <= 77) return "Snow";
-        if (code >= 80 && code <= 82) return "Showers";
-        if (code === 85 || code === 86) return "Snow showers";
-        if (code >= 95) return "Thunderstorm";
+        if (code === 0) return i18n("Clear");
+        if (code === 1) return i18n("Mostly clear");
+        if (code === 2) return i18n("Partly cloudy");
+        if (code === 3) return i18n("Overcast");
+        if (code === 45 || code === 48) return i18n("Fog");
+        if (code >= 51 && code <= 57) return i18n("Drizzle");
+        if (code >= 61 && code <= 67) return i18n("Rain");
+        if (code >= 71 && code <= 77) return i18n("Snow");
+        if (code >= 80 && code <= 82) return i18n("Showers");
+        if (code === 85 || code === 86) return i18n("Snow showers");
+        if (code >= 95) return i18n("Thunderstorm");
         return "";
     }
 
     Timer {
-        // retry after 1 min if geocoding/network failed at startup, otherwise refresh every 15 min
-        interval: !data.ready && data.city.trim().length > 0 ? 60 * 1000 : 15 * 60 * 1000
-        running: data.city.trim().length > 0
+        // retry after 1 min while there is no data, otherwise refresh every 15 min;
+        // nothing to retry when the city does not exist, or a request is in flight
+        interval: !data.ready ? 60 * 1000 : 15 * 60 * 1000
+        running: data.city.trim().length > 0 && !data.cityNotFound
         repeat: true
-        onTriggered: isNaN(data.latitude) || isNaN(data.longitude) ? data.geocode() : data.fetch()
+        onTriggered: {
+            data._now = Date.now();
+            if (data.busy)
+                return;
+            if (isNaN(data.latitude) || isNaN(data.longitude))
+                data.geocode();
+            else
+                data.fetch();
+        }
     }
 }

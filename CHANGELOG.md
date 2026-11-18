@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.8.0-alpha.1
+
+Media player (`PlayerPopup` & `Glasplayer`)
+- Redesigned `PlayerPopup` with full-bleed cover art, SDF-antialiased rounded
+  corners (`Kirigami.ShadowedTexture`), dark scrim, active audio output sink
+  label, and dynamic cover-colored waves (`Kirigami.ImageColors`).
+- Replaced per-frame 30 fps software `Canvas` wave redraws with pre-rendered
+  GPU-scaled `WaveLayer`s and smooth `Behavior on fillW` progress updates.
+- Unified album cover prefetch/render `sourceSize` to `512×512` across
+  `MprisSource`, `Cover`, and `PlayerPopup`.
+- Added `WheelSkipper` so one scroll gesture skips a single track; seeking
+  moves only the thumb while dragging and sends one seek on release; resilient
+  MPRIS position/length handling for Firefox and Spotify Connect track resolution.
+
+Performance
+- Deduplicated dock pointer tracking (`HoverHandler.onPointChanged` quantized to
+  `0.5 px`), ignored sub-`0.05 px` zoom deltas, and trimmed per-frame delegate
+  rebindings.
+- Added `120 ms` `previewSwitchTimer` when moving between dock icons with window
+  previews already open.
+- Bucketed `GlassSurface` frost grain tile size in `256 px` steps so morph
+  animations never re-render the FBO every frame.
+- Cached applied `QRegion` per `QQuickWindow` in `BlurBehind` (`org.glasdock.blur`)
+  so unchanged blur regions are not re-sent to KWin.
+- Stopped `WeatherData` 1-minute retry timer when a city does not exist.
+
+UX, accessibility & fixes
+- Wrapped user-facing strings in `i18n()` and unified short date formatting
+  (`ddd, d MMM`).
+- Added keyboard focus (`activeFocusOnTab`), `Accessible` roles/names, and
+  `Return`/`Space` activation to dock icons, tiles, `GlassButton`, and panel
+  widgets; Launcher `Esc` clears search before closing and Up arrow on the top
+  grid row returns focus to search.
+- Anchored window previews above the zoomed icon top, added drag-and-drop
+  (open files on icon, drop `.desktop` to pin, drag pinned icon out to unpin),
+  and added `.desktop` JumpList actions and virtual desktop move actions to the
+  dock right-click menu.
+- Fixed light-theme dock separators, made all settings `SpinBox` controls
+  editable, fixed `ConfigLauncher` section/label placement, and added vertical
+  panel support (`Plasmoid.formFactor` / `LeftEdge` / `RightEdge`) to
+  `Glasclock`, `Glasweather`, `Glasplayer`, and `GlassPopup`.
+- Fixed `Glasclock` holiday country detection from time zone (`country.sh`) and
+  post-suspend clock sync; fixed `WeatherData` request slots and city/region
+  qualifiers.
+
 ## 0.7.0-alpha.1
 
 Project
