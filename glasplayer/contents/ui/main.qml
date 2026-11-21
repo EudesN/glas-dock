@@ -219,6 +219,7 @@ PlasmoidItem {
                 accent: root.accent
                 isDark: root.isDark
                 cardRadius: root.cfg.popupRadius
+                showWaves: root.cfg.showWaves
                 onCloseRequested: popup.close()
             }
         }

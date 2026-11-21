@@ -7,6 +7,7 @@ import org.kde.kcmutils as KCM
 // Glasdock settings — Widgets
 KCM.SimpleKCM {
     property alias cfg_showPlayer: showPlayer.checked
+    property alias cfg_showPlayerWaves: showPlayerWaves.checked
     property alias cfg_showWeather: showWeather.checked
     property alias cfg_showClock: showClock.checked
     property alias cfg_weatherCity: weatherCity.text
@@ -22,6 +23,11 @@ KCM.SimpleKCM {
             id: showPlayer
             Kirigami.FormData.label: i18n("Show:")
             text: i18n("Media player")
+        }
+        QQC2.CheckBox {
+            id: showPlayerWaves
+            enabled: showPlayer.checked
+            text: i18n("Dynamic waves on the player progress bar")
         }
         QQC2.CheckBox {
             id: showWeather

@@ -4,6 +4,7 @@
  */
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import QtQuick.Window
 import org.kde.kirigami as Kirigami
@@ -22,8 +23,10 @@ Item {
     property color accent: Kirigami.Theme.highlightColor
     property bool isDark: true
     property real cardRadius: 22
+    property bool showWaves: true
 
     readonly property bool hasPlayer: player !== null && player !== undefined
+    readonly property bool hasTrackedClock: hasPlayer && player.currentPosition !== undefined
     readonly property bool playing: hasPlayer && player.playbackStatus === Mpris.PlaybackStatus.Playing
     readonly property string art: hasPlayer ? (player.artUrl || "").toString() : ""
     readonly property bool hasCover: coverImg.status === Image.Ready
@@ -33,14 +36,17 @@ Item {
     property double _baseTimeMs: 0
     property real _cachedLength: 0
     property real livePosition: 0
-    readonly property real effectiveLength: hasPlayer
-        ? (player.length > 0 ? player.length : _cachedLength) : 0
+    readonly property real effectiveLength: !hasPlayer ? 0
+        : hasTrackedClock ? player.trackedLength
+        : (player.length > 0 ? player.length : _cachedLength)
     readonly property real progress: effectiveLength > 0
         ? Math.max(0, Math.min(1, livePosition / effectiveLength)) : 0
     readonly property color fgColor: (hasCover || isDark) ? "#ffffff" : "#1d1d1f"
     readonly property color mutedFg: (hasCover || isDark) ? Qt.rgba(1, 1, 1, 0.78) : Qt.rgba(0.11, 0.11, 0.12, 0.72)
 
     function _currentInterpolated() {
+        if (hasTrackedClock)
+            return player.currentPosition();
         if (!hasPlayer || !playing || _baseTimeMs <= 0)
             return _basePos;
         const elapsedUs = Math.max(0, Date.now() - _baseTimeMs) * 1000;
@@ -49,6 +55,17 @@ Item {
     }
 
     function syncClock(forcePos) {
+        if (hasTrackedClock) {
+            if (forcePos !== undefined) {
+                const p = Math.max(0, forcePos);
+                if (player.previewSeek)
+                    player.previewSeek(p);
+                livePosition = p;
+            } else {
+                livePosition = player.currentPosition();
+            }
+            return;
+        }
         if (hasPlayer && player.length > 0)
             _cachedLength = player.length;
         if (forcePos !== undefined) {
@@ -60,9 +77,7 @@ Item {
         }
         const curLive = _currentInterpolated();
         const rawPos = hasPlayer ? Math.max(0, player.position || 0) : 0;
-        // Browsers (e.g. Firefox native MPRIS) often emit position=0 and omit length
-        // while playing; ignore bogus 0 resets so the local clock doesn't snap back.
-        if (rawPos === 0 && (!hasPlayer || (player.length || 0) <= 0) && curLive > 1500000) {
+        if (rawPos === 0 && playing && (!hasPlayer || (player.length || 0) <= 0) && curLive > 0) {
             _basePos = curLive;
             _baseTimeMs = Date.now();
             livePosition = curLive;
@@ -81,7 +96,10 @@ Item {
 
     onPlayerChanged: {
         _cachedLength = (hasPlayer && player.length > 0) ? player.length : 0;
-        syncClock(hasPlayer ? Math.max(0, player.position || 0) : 0);
+        if (hasTrackedClock)
+            livePosition = player.currentPosition();
+        else
+            syncClock(hasPlayer ? Math.max(0, player.position || 0) : 0);
         if (player && player.updatePosition)
             player.updatePosition();
     }
@@ -98,18 +116,27 @@ Item {
         if (hasPlayer && player.length > 0)
             _cachedLength = player.length;
         syncClock();
+        applyCachedOrUpdateColors();
         if (player && player.updatePosition)
             player.updatePosition();
     }
 
     Connections {
         target: popup.player
+        function onClockRevisionChanged() {
+            if (!popup.seeking && popup.hasTrackedClock)
+                popup.livePosition = popup.player.currentPosition();
+        }
         function onLengthChanged() {
-            if (popup.hasPlayer && popup.player.length > 0)
+            if (!popup.hasTrackedClock && popup.hasPlayer && popup.player.length > 0)
                 popup._cachedLength = popup.player.length;
         }
-        function onPositionChanged() { if (!popup.seeking) popup.syncClock(); }
+        function onPositionChanged() { if (!popup.seeking && !popup.hasTrackedClock) popup.syncClock(); }
         function onPlaybackStatusChanged() {
+            if (popup.hasTrackedClock) {
+                popup.livePosition = popup.player.currentPosition();
+                return;
+            }
             const cur = popup._currentInterpolated();
             popup._basePos = cur;
             popup._baseTimeMs = Date.now();
@@ -119,6 +146,11 @@ Item {
                 popup.player.updatePosition();
         }
         function onTrackChanged() {
+            Qt.callLater(() => popup.applyCachedOrUpdateColors());
+            if (popup.hasTrackedClock) {
+                popup.livePosition = popup.player.currentPosition();
+                return;
+            }
             // the proxy's title also changes when a Spotify id resolves to the
             // real name: only a different underlying track resets the progress
             const key = popup.player ? (popup.player.trackKey !== undefined ? popup.player.trackKey : popup.player.track) : "";
@@ -148,8 +180,9 @@ Item {
 
     signal closeRequested()
 
-    implicitWidth: Kirigami.Units.gridUnit * 25
-    implicitHeight: Math.max(Kirigami.Units.gridUnit * 10.8, contentCol.implicitHeight + Kirigami.Units.largeSpacing * 2.4)
+    implicitWidth: Math.round(Kirigami.Units.gridUnit * 22)
+    implicitHeight: Math.round(Math.max(Kirigami.Units.gridUnit * 15,
+        contentCol.implicitHeight + Kirigami.Units.largeSpacing * 2.0))
 
     function fmt(us) {
         const s = Math.max(0, Math.floor(us / 1000000));
@@ -171,48 +204,104 @@ Item {
     property color waveSecondary: Qt.lighter(popup.accent, 1.35)
     property color waveTertiary: Qt.lighter(popup.accent, 1.6)
 
-    function updateWavePalette() {
-        if (!hasCover) {
-            wavePrimary = popup.accent;
-            waveSecondary = Qt.lighter(popup.accent, 1.32);
-            waveTertiary = Qt.lighter(popup.accent, 1.55);
+    function resetWavePalette() {
+        wavePrimary = popup.accent;
+        waveSecondary = Qt.lighter(popup.accent, 1.32);
+        waveTertiary = Qt.lighter(popup.accent, 1.55);
+    }
+
+    function applyCachedOrUpdateColors() {
+        if (!popup.art) {
+            resetWavePalette();
             return;
         }
-        const candidates = [];
-        const pal = imgColors.palette;
-        for (let i = 0; i < pal.length; i++) {
-            const c = pal[i].color;
-            const sat = c.hsvHue >= 0 ? c.hsvSaturation : 0;
-            const val = c.hsvValue;
-            // Favor rich, saturated mid/bright colors from the album art
-            const score = sat * (0.45 + 0.55 * (pal[i].ratio || 0)) * (val > 0.15 ? 1.0 : 0.4);
-            candidates.push({ color: c, score: score });
+        const cached = hasPlayer && player.cachedPalette ? player.cachedPalette(popup.art) : null;
+        if (cached) {
+            wavePrimary = cached.p1;
+            waveSecondary = cached.p2;
+            waveTertiary = cached.p3;
+            return;
         }
-        if (imgColors.highlight)
-            candidates.push({ color: imgColors.highlight, score: (imgColors.highlight.hsvSaturation || 0) * 0.85 });
-        if (imgColors.dominant)
-            candidates.push({ color: imgColors.dominant, score: (imgColors.dominant.hsvSaturation || 0) * 0.75 });
-        candidates.sort((a, b) => b.score - a.score);
+        colorProbe.sampleUrl(popup.art);
+    }
 
-        const c1Raw = candidates.length > 0 ? candidates[0].color : popup.accent;
-        let c2Raw = null;
-        for (let i = 1; i < candidates.length; i++) {
-            const dHue = Math.abs((candidates[i].color.hsvHue || 0) - (c1Raw.hsvHue || 0));
-            if (dHue > 0.05 || Math.abs(candidates[i].color.hsvValue - c1Raw.hsvValue) > 0.18) {
-                c2Raw = candidates[i].color;
-                break;
+    function extractDeterministicPalette(data) {
+        const BUCKETS = 18;
+        const sumW = new Array(BUCKETS).fill(0);
+        const sumR = new Array(BUCKETS).fill(0);
+        const sumG = new Array(BUCKETS).fill(0);
+        const sumB = new Array(BUCKETS).fill(0);
+
+        for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] < 128)
+                continue;
+            const r = data[i] / 255;
+            const g = data[i + 1] / 255;
+            const b = data[i + 2] / 255;
+            const mx = Math.max(r, g, b);
+            const mn = Math.min(r, g, b);
+            const d = mx - mn;
+            const v = mx;
+            const s = mx > 0 ? d / mx : 0;
+            if (v < 0.14 || s < 0.16)
+                continue;
+            let h = 0;
+            if (d > 0) {
+                if (mx === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+                else if (mx === g) h = ((b - r) / d + 2) / 6;
+                else h = ((r - g) / d + 4) / 6;
+            }
+            const idx = Math.floor(h * BUCKETS) % BUCKETS;
+            const w = (0.35 + 0.65 * s) * (0.40 + 0.60 * v);
+            sumW[idx] += w;
+            sumR[idx] += r * w;
+            sumG[idx] += g * w;
+            sumB[idx] += b * w;
+        }
+
+        // Smooth bucket ranking across adjacent hue bins so colors near a bin edge don't split
+        const scores = new Array(BUCKETS);
+        let best1 = -1, bestScore1 = 0;
+        for (let i = 0; i < BUCKETS; i++) {
+            const prev = (i + BUCKETS - 1) % BUCKETS;
+            const next = (i + 1) % BUCKETS;
+            scores[i] = sumW[i] + 0.25 * (sumW[prev] + sumW[next]);
+            if (sumW[i] > 0 && scores[i] > bestScore1) {
+                bestScore1 = scores[i];
+                best1 = i;
             }
         }
+        if (best1 < 0) {
+            resetWavePalette();
+            return;
+        }
+
+        let best2 = -1, bestScore2 = 0;
+        for (let i = 0; i < BUCKETS; i++) {
+            const dist = Math.min(Math.abs(i - best1), BUCKETS - Math.abs(i - best1));
+            if (dist >= 2 && sumW[i] > 0 && scores[i] > bestScore2 && sumW[i] >= sumW[best1] * 0.15) {
+                bestScore2 = scores[i];
+                best2 = i;
+            }
+        }
+
+        const c1Raw = Qt.rgba(sumR[best1] / sumW[best1], sumG[best1] / sumW[best1], sumB[best1] / sumW[best1], 1.0);
+        const c2Raw = best2 >= 0
+            ? Qt.rgba(sumR[best2] / sumW[best2], sumG[best2] / sumW[best2], sumB[best2] / sumW[best2], 1.0)
+            : null;
         const p1 = boostSwatch(c1Raw, 0.72, 0.88);
         const p2 = c2Raw ? boostSwatch(c2Raw, 0.55, 0.94) : Qt.lighter(p1, 1.36);
         const p3 = Qt.rgba(Math.min(1, p2.r * 0.65 + 0.35), Math.min(1, p2.g * 0.65 + 0.35), Math.min(1, p2.b * 0.65 + 0.35), 1.0);
         wavePrimary = p1;
         waveSecondary = p2;
         waveTertiary = p3;
+        if (hasPlayer && player.storePalette && popup.art)
+            player.storePalette(popup.art, p1, p2, p3);
     }
 
-    onHasCoverChanged: updateWavePalette()
-    onAccentChanged: if (!hasCover) updateWavePalette()
+    onHasCoverChanged: applyCachedOrUpdateColors()
+    onArtChanged: applyCachedOrUpdateColors()
+    onAccentChanged: if (!hasCover) resetWavePalette()
 
     // Periodic MPRIS D-Bus sync while open (smooth interpolation runs locally at 30fps)
     Timer {
@@ -235,13 +324,47 @@ Item {
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         cache: true
-        onStatusChanged: if (status === Image.Ready) imgColors.update()
+        onStatusChanged: if (status === Image.Ready) popup.applyCachedOrUpdateColors()
     }
 
-    Kirigami.ImageColors {
-        id: imgColors
-        source: coverImg
-        onPaletteChanged: popup.updateWavePalette()
+    // Tiny 24x24 canvas for 100% deterministic hue-histogram sampling via Canvas.loadImage
+    // (unloaded immediately after sampling so zero image memory is retained).
+    Canvas {
+        id: colorProbe
+        width: 24
+        height: 24
+        opacity: 0
+        enabled: false
+        property string targetUrl: ""
+
+        function sampleUrl(u) {
+            if (!u)
+                return;
+            if (targetUrl && targetUrl !== u && isImageLoaded(targetUrl))
+                unloadImage(targetUrl);
+            targetUrl = u;
+            if (isImageLoaded(u))
+                requestPaint();
+            else
+                loadImage(u);
+        }
+
+        onImageLoaded: {
+            if (targetUrl && isImageLoaded(targetUrl))
+                requestPaint();
+        }
+        onPaint: {
+            const u = targetUrl;
+            if (!u || !isImageLoaded(u))
+                return;
+            const ctx = getContext("2d");
+            ctx.clearRect(0, 0, width, height);
+            ctx.drawImage(u, 0, 0, width, height);
+            const pixels = ctx.getImageData(0, 0, width, height).data;
+            unloadImage(u);
+            if (u === popup.art)
+                popup.extractDeterministicPalette(pixels);
+        }
     }
 
     // SDF-antialiased rounded cover art matching GlassSurface's exact corner curve
@@ -263,9 +386,9 @@ Item {
         visible: popup.hasCover || (popup.art.length > 0 && coverImg.status === Image.Loading)
         radius: Math.max(0, popup.effectiveRadius - 1)
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(0.05, 0.05, 0.07, 0.50) }
-            GradientStop { position: 0.45; color: Qt.rgba(0.05, 0.05, 0.07, 0.54) }
-            GradientStop { position: 1.0; color: Qt.rgba(0.03, 0.03, 0.05, 0.78) }
+            GradientStop { position: 0.0; color: Qt.rgba(0.04, 0.04, 0.06, 0.38) }
+            GradientStop { position: 0.42; color: Qt.rgba(0.04, 0.04, 0.06, 0.46) }
+            GradientStop { position: 1.0; color: Qt.rgba(0.03, 0.03, 0.05, 0.82) }
         }
     }
 
@@ -300,9 +423,9 @@ Item {
         anchors.fill: parent
         anchors.leftMargin: Kirigami.Units.gridUnit * 1.25
         anchors.rightMargin: Kirigami.Units.gridUnit * 1.25
-        anchors.topMargin: Kirigami.Units.gridUnit * 0.95
-        anchors.bottomMargin: Kirigami.Units.gridUnit * 1.05
-        spacing: Kirigami.Units.smallSpacing * 1.6
+        anchors.topMargin: Kirigami.Units.gridUnit * 0.9
+        anchors.bottomMargin: Kirigami.Units.gridUnit * 1.0
+        spacing: Kirigami.Units.smallSpacing * 1.5
 
         // --------------------------------------------------- top bar (output + raise)
         RowLayout {
@@ -314,10 +437,12 @@ Item {
                 Layout.maximumWidth: Math.round(contentCol.width * 0.65)
                 text: popup.audioOutputName
                 color: popup.fgColor
-                opacity: 0.88
+                opacity: 0.90
                 font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight
+                style: popup.hasCover ? Text.Raised : Text.Normal
+                styleColor: Qt.rgba(0, 0, 0, 0.45)
             }
 
             Item { Layout.fillWidth: true }
@@ -359,11 +484,13 @@ Item {
                         popup.closeRequested();
                     }
                 }
-
-                PC3.ToolTip.visible: raiseMouse.containsMouse
-                PC3.ToolTip.text: popup.hasPlayer ? i18n("Open %1", popup.player.identity) : ""
-                PC3.ToolTip.delay: Kirigami.Units.toolTipDelay
             }
+        }
+
+        // Let the upper portion of album covers & video thumbnails breathe
+        Item {
+            Layout.fillHeight: true
+            Layout.minimumHeight: Kirigami.Units.smallSpacing
         }
 
         // --------------------------------------------------- track title • artist
@@ -413,9 +540,9 @@ Item {
             Item {
                 id: seekContainer
                 Layout.fillWidth: true
-                implicitHeight: 34
+                implicitHeight: popup.showWaves ? 34 : 22
 
-                readonly property real barY: 22
+                readonly property real barY: popup.showWaves ? 22 : 11
                 property bool animateFill: false
                 property real fillW: Math.max(0, Math.min(width, width * popup.progress))
                 Behavior on fillW {
@@ -424,6 +551,9 @@ Item {
                 }
                 property real waveAmp: popup.playing ? 1.0 : 0.25
                 Behavior on waveAmp { NumberAnimation { duration: 350; easing.type: Easing.OutCubic } }
+                // Scales wave height smoothly when the played bar is still short
+                readonly property real sizeAmp: Math.max(0, Math.min(1, Math.pow(Math.max(0, fillW - 4) / 72, 0.72)))
+                readonly property real edgeFadeStop: Math.min(0.46, Math.max(0.18, 46 / Math.max(1, fillW)))
 
                 Timer {
                     id: smoothEnableTimer
@@ -438,41 +568,101 @@ Item {
                     onTriggered: popup.refreshLivePosition()
                 }
 
-                // Pre-rendered wave layers painted only when the cover palette
-                // changes, then scaled and animated purely on the GPU scene graph.
+                // Pre-rendered periodic silk wave ribbons painted only when the cover
+                // palette changes, then scrolled & masked purely on the GPU at
+                // fixed FBO size so wavelength and height adapt naturally to fillW.
+                Item {
+                    id: waveStrip
+                    x: 0
+                    y: 0
+                    width: Math.max(1, seekContainer.width)
+                    height: seekContainer.barY + 2
+                    clip: true
+                    visible: false
+                    layer.enabled: popup.showWaves
+                    layer.smooth: true
+
+                    WaveLayer {
+                        shapeKind: 0
+                        waveColor: popup.waveTertiary
+                        maxH: 13.5
+                        periodPx: 256
+                        phaseOffset: 0.4
+                        alpha: 0.42
+                        scrollDuration: 6400
+                        reverse: false
+                        breathMin: 0.76
+                        breathDuration: 1900
+                    }
+                    WaveLayer {
+                        shapeKind: 1
+                        waveColor: popup.waveSecondary
+                        maxH: 12.5
+                        periodPx: 196
+                        phaseOffset: 2.3
+                        alpha: 0.62
+                        scrollDuration: 4600
+                        reverse: true
+                        breathMin: 0.72
+                        breathDuration: 1450
+                    }
+                    WaveLayer {
+                        shapeKind: 2
+                        waveColor: popup.wavePrimary
+                        maxH: 10.5
+                        periodPx: 152
+                        phaseOffset: 4.2
+                        alpha: 0.88
+                        scrollDuration: 3500
+                        reverse: false
+                        breathMin: 0.70
+                        breathDuration: 1150
+                    }
+                }
+
+                Item {
+                    id: waveMask
+                    x: 0
+                    y: 0
+                    width: waveStrip.width
+                    height: waveStrip.height
+                    visible: false
+                    layer.enabled: popup.showWaves
+
+                    Rectangle {
+                        x: 0
+                        y: 0
+                        width: Math.max(0, seekContainer.fillW - 2)
+                        height: parent.height
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            GradientStop { position: 0.0; color: "transparent" }
+                            GradientStop { position: seekContainer.edgeFadeStop; color: "#ffffff" }
+                            GradientStop { position: 1.0 - seekContainer.edgeFadeStop; color: "#ffffff" }
+                            GradientStop { position: 1.0; color: "transparent" }
+                        }
+                    }
+                }
+
                 Item {
                     x: 0
                     y: 0
-                    width: seekContainer.width
-                    height: seekContainer.barY + 2
-                    visible: seekContainer.fillW > 3
+                    width: Math.max(0, seekContainer.fillW)
+                    height: waveStrip.height
+                    clip: true
+                    visible: popup.showWaves
+                    opacity: seekContainer.fillW > 3 ? 1 : 0
 
-                    WaveLayer {
-                        waveColor: popup.waveTertiary
-                        maxH: seekContainer.barY * 0.78
-                        freq: 6.2
-                        phaseOffset: 0.8
-                        alpha: 0.48
-                        breathMin: 0.68
-                        breathDuration: 1350
-                    }
-                    WaveLayer {
-                        waveColor: popup.waveSecondary
-                        maxH: seekContainer.barY * 0.90
-                        freq: 9.4
-                        phaseOffset: 2.3
-                        alpha: 0.70
-                        breathMin: 0.62
-                        breathDuration: 980
-                    }
-                    WaveLayer {
-                        waveColor: popup.wavePrimary
-                        maxH: seekContainer.barY * 0.70
-                        freq: 12.6
-                        phaseOffset: 4.1
-                        alpha: 0.88
-                        breathMin: 0.65
-                        breathDuration: 760
+                    MultiEffect {
+                        x: 0
+                        y: 0
+                        width: waveStrip.width
+                        height: waveStrip.height
+                        source: waveStrip
+                        maskEnabled: true
+                        maskSource: waveMask
+                        maskThresholdMin: 0.5
+                        maskSpreadAtMin: 1.0
                     }
                 }
 
@@ -497,8 +687,8 @@ Item {
                         Behavior on color { ColorAnimation { duration: 320 } }
                     }
 
-                    // Circular thumb matching the reference (dominant fill + crisp white ring)
-                    Rectangle {
+                    // Circular thumb matching the reference (dominant fill + crisp white ring + soft glow)
+                    Kirigami.ShadowedRectangle {
                         width: seekArea.pressed ? 18 : 16
                         height: width
                         radius: width / 2
@@ -508,6 +698,8 @@ Item {
                         Behavior on color { ColorAnimation { duration: 320 } }
                         border.width: 2.5
                         border.color: "#ffffff"
+                        shadow.size: popup.showWaves ? 14 : 6
+                        shadow.color: Qt.rgba(popup.wavePrimary.r, popup.wavePrimary.g, popup.wavePrimary.b, popup.showWaves ? 0.68 : 0.35)
                         Behavior on width { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
                     }
                 }
@@ -542,10 +734,25 @@ Item {
                         else
                             popup.player.position = pos;
                     }
-                    onPressed: mouse => { popup.seeking = true; preview(mouse.x); }
+                    onPressed: mouse => {
+                        popup.seeking = true;
+                        if (popup.hasPlayer && popup.player.setSeeking)
+                            popup.player.setSeeking(true);
+                        preview(mouse.x);
+                    }
                     onPositionChanged: mouse => { if (pressed) preview(mouse.x); }
-                    onReleased: commit()
-                    onCanceled: { dragPos = -1; popup.seeking = false; popup.syncClock(); }
+                    onReleased: {
+                        if (popup.hasPlayer && popup.player.setSeeking)
+                            popup.player.setSeeking(false);
+                        commit();
+                    }
+                    onCanceled: {
+                        dragPos = -1;
+                        popup.seeking = false;
+                        if (popup.hasPlayer && popup.player.setSeeking)
+                            popup.player.setSeeking(false);
+                        popup.syncClock();
+                    }
                 }
             }
 
@@ -665,24 +872,46 @@ Item {
 
     component WaveLayer: Canvas {
         id: wlayer
+        property int shapeKind: 0
         property color waveColor: popup.accent
         property real maxH: 18
-        property real freq: 8.0
+        property int periodPx: 96
         property real phaseOffset: 0.0
         property real alpha: 0.7
+        property int scrollDuration: 3000
+        property bool reverse: false
         property real breathMin: 0.65
         property int breathDuration: 1000
         property real breath: 1.0
+        property real scrollX: reverse ? -periodPx : 0
 
-        width: 256
+        readonly property int cycles: Math.max(4, Math.ceil((seekContainer.width + periodPx) / periodPx) + 1)
+        width: periodPx * cycles
         height: 24
-        x: 0
+        x: scrollX
         y: 0
-        onWaveColorChanged: requestPaint()
-        Component.onCompleted: requestPaint()
+        onWaveColorChanged: if (popup.showWaves) requestPaint()
+        onWidthChanged: if (popup.showWaves) requestPaint()
+        Component.onCompleted: if (popup.showWaves) requestPaint()
+
+        Connections {
+            target: popup
+            function onShowWavesChanged() {
+                if (popup.showWaves)
+                    wlayer.requestPaint();
+            }
+        }
+
+        NumberAnimation on scrollX {
+            running: popup.showWaves && popup.windowShown && popup.playing
+            loops: Animation.Infinite
+            from: wlayer.reverse ? -wlayer.periodPx : 0
+            to: wlayer.reverse ? 0 : -wlayer.periodPx
+            duration: wlayer.scrollDuration
+        }
 
         SequentialAnimation on breath {
-            running: popup.windowShown && popup.playing
+            running: popup.showWaves && popup.windowShown && popup.playing
             loops: Animation.Infinite
             NumberAnimation { to: wlayer.breathMin; duration: wlayer.breathDuration; easing.type: Easing.InOutSine }
             NumberAnimation { to: 1.0; duration: wlayer.breathDuration; easing.type: Easing.InOutSine }
@@ -691,8 +920,7 @@ Item {
         transform: Scale {
             origin.x: 0
             origin.y: seekContainer.barY
-            xScale: Math.max(0, seekContainer.fillW / 256)
-            yScale: seekContainer.waveAmp * wlayer.breath
+            yScale: seekContainer.waveAmp * seekContainer.sizeAmp * wlayer.breath
         }
 
         onPaint: {
@@ -700,22 +928,40 @@ Item {
             ctx.reset();
             const spanW = width;
             const baseY = seekContainer.barY;
-            const steps = 64;
+            const steps = Math.max(72, wlayer.cycles * 36);
             ctx.beginPath();
             ctx.moveTo(0, baseY);
             for (let i = 0; i <= steps; i++) {
-                const u = i / steps;
-                const env = Math.pow(Math.sin(Math.PI * u), 0.78);
-                const mod = 0.52 + 0.48 * Math.sin(u * wlayer.freq + wlayer.phaseOffset);
-                const h = wlayer.maxH * env * mod;
-                ctx.lineTo(u * spanW, baseY - h);
+                const px = (i / steps) * spanW;
+                const a = (px / wlayer.periodPx) * Math.PI * 2 + wlayer.phaseOffset;
+                let mod;
+                if (wlayer.shapeKind === 0) {
+                    // Longest, lowest translucent silk arch touching the bar cleanly between swells
+                    mod = Math.pow(0.5 + 0.5 * Math.sin(a), 1.45);
+                } else if (wlayer.shapeKind === 1) {
+                    // Broad asymmetric dual-lobe silk ribbon
+                    const b1 = Math.pow(0.5 + 0.5 * Math.sin(a), 1.65);
+                    const b2 = Math.pow(0.5 + 0.5 * Math.sin(a + 2.2), 2.5) * 0.48;
+                    mod = Math.min(1.0, b1 + b2);
+                } else {
+                    // Sleek luminous front highlight ribbon hugging the played bar
+                    const s = 0.5 + 0.5 * Math.sin(a);
+                    mod = Math.pow(s, 1.9) * (0.78 + 0.22 * Math.sin(a * 2 + 0.9));
+                }
+                const h = wlayer.maxH * Math.max(0.0, Math.min(1.0, mod));
+                ctx.lineTo(px, baseY - h);
             }
             ctx.lineTo(spanW, baseY);
             ctx.closePath();
             const col = wlayer.waveColor;
             const grad = ctx.createLinearGradient(0, baseY - wlayer.maxH, 0, baseY);
-            grad.addColorStop(0.0, Qt.rgba(col.r, col.g, col.b, wlayer.alpha));
-            grad.addColorStop(1.0, Qt.rgba(col.r, col.g, col.b, wlayer.alpha * 0.55));
+            if (wlayer.shapeKind === 2) {
+                grad.addColorStop(0.0, Qt.rgba(col.r, col.g, col.b, wlayer.alpha * 0.72));
+                grad.addColorStop(1.0, Qt.rgba(col.r, col.g, col.b, wlayer.alpha));
+            } else {
+                grad.addColorStop(0.0, Qt.rgba(col.r, col.g, col.b, wlayer.alpha * 0.95));
+                grad.addColorStop(1.0, Qt.rgba(col.r, col.g, col.b, wlayer.alpha * 0.50));
+            }
             ctx.fillStyle = grad;
             ctx.fill();
         }

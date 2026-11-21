@@ -424,7 +424,7 @@ Item {
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 12
                 Layout.fillHeight: true
                 visible: !view.searching
-                PC3.ScrollBar.horizontal.policy: PC3.ScrollBar.AlwaysOff
+                QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
 
                 ListView {
                     id: categories
@@ -640,9 +640,11 @@ Item {
                 }
             }
 
-            PC3.ScrollBar {
+            QQC2.ScrollBar {
                 id: gridScroll
                 Layout.fillHeight: true
+                policy: QQC2.ScrollBar.AlwaysOn
+                enabled: grid.contentHeight > grid.height
                 // keep the space reserved so the grid does not reflow when it appears
                 opacity: grid.contentHeight > grid.height ? 1 : 0
             }

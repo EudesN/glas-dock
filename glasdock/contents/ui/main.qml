@@ -1215,7 +1215,7 @@ PlasmoidItem {
             }
         }
 
-        Component { id: playerPopupComponent; Widgets.PlayerPopup { player: root.activePlayer; accent: dock.accent; isDark: dock.isDark; cardRadius: dock.cfg.cornerRadius + 4; onCloseRequested: popupFrame.playClose() } }
+        Component { id: playerPopupComponent; Widgets.PlayerPopup { player: root.activePlayer; accent: dock.accent; isDark: dock.isDark; cardRadius: dock.cfg.cornerRadius + 4; showWaves: dock.cfg.showPlayerWaves; onCloseRequested: popupFrame.playClose() } }
         Component { id: weatherPopupComponent; Widgets.WeatherPopup { weather: root.weatherData; accent: dock.accent; isDark: dock.isDark } }
         Component { id: clockPopupComponent; Widgets.ClockPopup { now: root.now; accent: dock.accent; isDark: dock.isDark } }
 

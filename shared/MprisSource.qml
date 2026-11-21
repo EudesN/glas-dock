@@ -25,6 +25,116 @@ Item {
     property int matchedTaskRow: -1
     property string matchedTaskAppId: ""
 
+    // Persistent playback clock + cached track length across PlayerPopup open/close
+    // cycles and Firefox MPRIS Position=0 / missing-length glitches.
+    property string _lastClockKey: ""
+    property int _lastPlaybackStatus: 0
+    property real _clockBasePos: 0
+    property double _clockBaseTimeMs: 0
+    property double _resumedAtMs: 0
+    property real _cachedLength: 0
+    property int clockRevision: 0
+    property bool clockSeeking: false
+
+    function currentPosition() {
+        if (!rawPlayer)
+            return 0;
+        const len = effectiveLength();
+        if (rawPlayer.playbackStatus !== Mpris.PlaybackStatus.Playing || _clockBaseTimeMs <= 0)
+            return len > 0 ? Math.min(len, _clockBasePos) : _clockBasePos;
+        const next = _clockBasePos + Math.max(0, Date.now() - _clockBaseTimeMs) * 1000;
+        return len > 0 ? Math.min(len, next) : next;
+    }
+
+    function effectiveLength() {
+        if (!rawPlayer)
+            return 0;
+        const rawLen = rawPlayer.length || 0;
+        if (rawLen > 0)
+            return rawLen;
+        return _cachedLength;
+    }
+
+    function _freezeClockAt(pos) {
+        _clockBasePos = Math.max(0, pos);
+        _clockBaseTimeMs = Date.now();
+        clockRevision++;
+    }
+
+    function _handleClockTrackOrPlayer() {
+        if (!rawPlayer) {
+            _lastClockKey = "";
+            _lastPlaybackStatus = 0;
+            _clockBasePos = 0;
+            _clockBaseTimeMs = 0;
+            _cachedLength = 0;
+            clockRevision++;
+            return;
+        }
+        if ((rawPlayer.length || 0) > 0)
+            _cachedLength = rawPlayer.length;
+        const key = (rawPlayer.identity || "") + "|" + rawTrack;
+        if (key !== _lastClockKey) {
+            _lastClockKey = key;
+            _paletteArtUrl = "";
+            _paletteColors = null;
+            _cachedLength = (rawPlayer.length || 0) > 0 ? rawPlayer.length : 0;
+            _lastPlaybackStatus = rawPlayer.playbackStatus;
+            _freezeClockAt(Math.max(0, rawPlayer.position || 0));
+        }
+    }
+
+    function _syncClockFromRaw() {
+        if (!rawPlayer || clockSeeking)
+            return;
+        if ((rawPlayer.length || 0) > 0)
+            _cachedLength = rawPlayer.length;
+        const rawPos = Math.max(0, rawPlayer.position || 0);
+        const cur = currentPosition();
+        const isPlaying = rawPlayer.playbackStatus === Mpris.PlaybackStatus.Playing;
+        const hasLen = (rawPlayer.length || 0) > 0;
+        // Browsers (e.g. Firefox native MPRIS) emit Position=0 and omit mpris:length
+        // while playing, or emit Position=0 right when resuming; keep our local clock.
+        if (rawPos === 0 && isPlaying && cur > 0 && (!hasLen || (Date.now() - _resumedAtMs) < 3000))
+            return;
+        if (rawPos > 0 && isPlaying && Math.abs(rawPos - cur) < 1500000)
+            return;
+        _freezeClockAt(rawPos);
+    }
+
+    Connections {
+        target: source.rawPlayer
+        function onLengthChanged() {
+            if (source.rawPlayer && source.rawPlayer.length > 0) {
+                source._cachedLength = source.rawPlayer.length;
+                source.clockRevision++;
+            }
+        }
+        function onPositionChanged() { source._syncClockFromRaw(); }
+        function onPlaybackStatusChanged() {
+            if (!source.rawPlayer)
+                return;
+            // Freeze elapsed time using the previous playing state before switching.
+            let frozen = source._clockBasePos;
+            if (source._lastPlaybackStatus === Mpris.PlaybackStatus.Playing && source._clockBaseTimeMs > 0) {
+                frozen = source._clockBasePos + Math.max(0, Date.now() - source._clockBaseTimeMs) * 1000;
+                const len = source.effectiveLength();
+                if (len > 0)
+                    frozen = Math.min(len, frozen);
+            }
+            const nextStatus = source.rawPlayer.playbackStatus;
+            if (nextStatus === Mpris.PlaybackStatus.Playing && source._lastPlaybackStatus !== Mpris.PlaybackStatus.Playing)
+                source._resumedAtMs = Date.now();
+            source._lastPlaybackStatus = nextStatus;
+            const rawPos = Math.max(0, source.rawPlayer.position || 0);
+            if (rawPos > 0 && (frozen <= 0 || Math.abs(rawPos - frozen) >= 1500000))
+                frozen = rawPos;
+            source._freezeClockAt(frozen);
+            if (source.rawPlayer.updatePosition)
+                source.rawPlayer.updatePosition();
+        }
+    }
+
     // Spotify Desktop on Linux leaves xesam:title, xesam:artist and mpris:artUrl
     // empty when playing on a remote Spotify Connect device (e.g. a phone), and
     // only exposes xesam:url = https://open.spotify.com/track/<22-char base62 id>,
@@ -42,6 +152,8 @@ Item {
     property string resolvedArtist: ""
     property string resolvedArtUrl: ""
     property var _cache: ({})
+    property string _paletteArtUrl: ""
+    property var _paletteColors: null
     property var _xhrOEmbed: null
     property var _xhrEmbed: null
 
@@ -59,6 +171,7 @@ Item {
 
     onRawTrackChanged: {
         resolveSpotifyTrack();
+        _handleClockTrackOrPlayer();
         if (rawPlayer && rawPlayer.updatePosition)
             Qt.callLater(() => { if (source.rawPlayer && source.rawPlayer.updatePosition) source.rawPlayer.updatePosition(); });
     }
@@ -186,6 +299,11 @@ Item {
         readonly property int playbackStatus: source.rawPlayer ? source.rawPlayer.playbackStatus : 0
         readonly property real position: source.rawPlayer ? source.rawPlayer.position : 0
         readonly property real length: source.rawPlayer ? source.rawPlayer.length : 0
+        readonly property real trackedLength: {
+            source.clockRevision;
+            return source.effectiveLength();
+        }
+        readonly property int clockRevision: source.clockRevision
         readonly property bool canSeek: source.rawPlayer ? source.rawPlayer.canSeek : false
         readonly property bool canGoPrevious: source.rawPlayer ? source.rawPlayer.canGoPrevious : false
         readonly property bool canGoNext: source.rawPlayer ? source.rawPlayer.canGoNext : false
@@ -195,9 +313,29 @@ Item {
             ? (source.rawPlayer.canRaise || source.matchedTaskRow >= 0)
             : false
 
-        function seekTo(pos) { if (source.rawPlayer) source.rawPlayer.position = pos; }
+        function currentPosition() { return source.currentPosition(); }
+        function cachedPalette(url) {
+            return (url && url === source._paletteArtUrl) ? source._paletteColors : null;
+        }
+        function storePalette(url, p1, p2, p3) {
+            if (!url)
+                return;
+            source._paletteArtUrl = url;
+            source._paletteColors = { p1: p1, p2: p2, p3: p3 };
+        }
+        function setSeeking(s) { source.clockSeeking = s; }
+        function previewSeek(pos) { source._freezeClockAt(pos); }
+        function seekTo(pos) {
+            source._freezeClockAt(pos);
+            if (source.rawPlayer)
+                source.rawPlayer.position = pos;
+        }
         function playPause() { if (source.rawPlayer) source.rawPlayer.PlayPause(); }
-        function previous() { if (source.rawPlayer) source.rawPlayer.Previous(); }
+        function previous() {
+            source._freezeClockAt(0);
+            if (source.rawPlayer)
+                source.rawPlayer.Previous();
+        }
         function next() { if (source.rawPlayer) source.rawPlayer.Next(); }
         function raise() {
             if (!source.rawPlayer)
@@ -230,6 +368,7 @@ Item {
         onTriggered: source._updateMatchedTask()
     }
     onRawPlayerChanged: {
+        _handleClockTrackOrPlayer();
         _updateMatchedTask();
         if (rawPlayer && rawPlayer.updatePosition)
             Qt.callLater(() => { if (source.rawPlayer && source.rawPlayer.updatePosition) source.rawPlayer.updatePosition(); });

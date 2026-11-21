@@ -22,6 +22,7 @@ KCM.SimpleKCM {
     property alias cfg_popupGap: popupGap.value
     property alias cfg_popupMorph: popupMorph.checked
     property alias cfg_popupMorphGap: popupMorphGap.value
+    property alias cfg_showWaves: showWaves.checked
 
     Kirigami.FormLayout {
         Kirigami.Separator { Kirigami.FormData.isSection: true; Kirigami.FormData.label: "Panel" }
@@ -76,6 +77,7 @@ KCM.SimpleKCM {
             valueFromText: t => parseInt(t)
         }
         QQC2.CheckBox { id: popupAnimation; text: "Animate opening and closing" }
+        QQC2.CheckBox { id: showWaves; text: i18n("Dynamic waves on the progress bar") }
         QQC2.CheckBox {
             id: popupMorph
             enabled: popupAnimation.checked

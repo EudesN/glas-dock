@@ -226,15 +226,6 @@ PlasmoidItem {
             columnSpacing: Math.round(compact.height * 0.25)
 
             PC3.Label {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.fillWidth: compact.vertical
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-                text: root.timeText(root.now)
-                font.weight: Font.DemiBold
-                font.features: { "tnum": 1 }      // digits don't jump around
-            }
-            PC3.Label {
                 visible: root.cfg.showDate
                 Layout.alignment: Qt.AlignHCenter
                 Layout.fillWidth: compact.vertical
@@ -243,6 +234,15 @@ PlasmoidItem {
                 text: root.now.toLocaleDateString(Qt.locale(), i18n("ddd, d MMM"))
                 opacity: 0.65
                 font: compact.stacked ? Kirigami.Theme.smallFont : Kirigami.Theme.defaultFont
+            }
+            PC3.Label {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.fillWidth: compact.vertical
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                text: root.timeText(root.now)
+                font.weight: Font.DemiBold
+                font.features: { "tnum": 1 }      // digits don't jump around
             }
         }
 
